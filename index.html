@@ -162,6 +162,10 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .dayp-h h3{margin:0;font-size:16px}
 .dayp-h .sp{flex:1}
 .dayp table tr{cursor:pointer}
+.dayp table td:first-child{box-shadow:inset 4px 0 0 var(--sc,transparent)}
+.stp{display:inline-flex;align-items:center;gap:6px;padding:1px 9px 1px 7px;border-radius:999px;font-size:12.5px;font-weight:700;border:1px solid color-mix(in srgb,var(--sc) 55%,transparent);background:color-mix(in srgb,var(--sc) 14%,var(--surface));color:var(--ink);white-space:nowrap}
+.stp::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sc)}
+.dtl-b{border-left:4px solid var(--sc,var(--line))!important}
 /* その日の時間軸：上の「空き」帯で、何時に何人空いているかが一目でわかる */
 .dtl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .dtl-in{display:grid;grid-template-columns:7.5em max-content;min-width:max-content}
@@ -647,6 +651,7 @@ $("memAdd").addEventListener("click",async()=>{const em=$("memEmail").value.trim
 <div class="toast" id="toast" hidden></div>
 
 <script>
+const stVar=c=>{if(c.shipped)return"var(--muted)";const s=STATES.find(x=>x[0]===c.state);return s?`var(${s[1]})`:"var(--line)"};
 const STATES=[["入庫待ち","--s0"],["入庫済み","--s1"],["作業待ち","--s2"],["作業中","--s3"],["合意待ち","--s4"],["部品待ち","--s5"],["完成","--s6"]];
 const KUBUN=["3か月点検","3か月点検＋Sメンテ","3か月点検＋Mメンテ","3か月点検＋Lメンテ","車検","車検＋Sメンテ","車検＋Mメンテ","車検＋Lメンテ","Sメンテ","Mメンテ","Lメンテ","Rメンテ","Rメンテ（DC16）","一般","新車","板金"];
 const TECHS=["栢原","木村","浅井","佐藤","北畠","上田","林","ドック","スプリヤント","カリム","ケサブ"];
@@ -1016,7 +1021,8 @@ $("att").addEventListener("click",async e=>{const b=e.target.closest("button[dat
   try{await patchSettings({absence:{[d]:{[t.name]:next}}});renderAtt()}catch(err){toast(errText(err))}});
 function renderDay(){const p=$("dayPanel");if(!selDay){p.hidden=true;return}p.hidden=false;
   const cap=capOn(selDay),L=dayLoad(selDay),r=cap?L.h/cap*100:0,dt=new Date(selDay+"T00:00"),wk=[0,6].includes(dt.getDay());
-  const rows=L.cars.sort((a,b)=>totalH(b)-totalH(a)).map(c=>`<tr data-id="${esc(c.id)}"><td>${esc(c.customer||"—")}｜${esc(c.plate||"—")}</td><td>${esc(c.kubun||"未選択")}</td><td>${esc(c.vtype||"—")}</td><td class="mono">${fmt(totalH(c))}h</td><td>${esc(c.shipped?"出庫済":(c.state||""))}</td></tr>`).join("");
+  const sIdx=c=>c.shipped?99:Math.max(0,STATES.findIndex(x=>x[0]===c.state));
+  const rows=L.cars.sort((a,b)=>sIdx(a)-sIdx(b)||totalH(b)-totalH(a)).map(c=>`<tr data-id="${esc(c.id)}" style="--sc:${stVar(c)}"><td>${esc(c.customer||"—")}｜${esc(c.plate||"—")}</td><td>${esc(c.kubun||"未選択")}</td><td>${esc(c.vtype||"—")}</td><td class="mono">${fmt(totalH(c))}h</td><td><span class="stp">${esc(c.shipped?"出庫済":(c.state||""))}</span></td></tr>`).join("");
   p.innerHTML=`<div class="dayp-h"><h3>${md(selDay)}（${"日月火水木金土"[dt.getDay()]}）</h3><span class="hint">${cap?`予約 ${fmt(L.h)}h／キャパ ${fmt(cap)}h（${Math.round(r)}%）・上限まで残り ${fmt(Math.max(0,cap*settings.limit/100-L.h))}h`:"キャパ0hの日"}</span><span class="sp"></span>`+
     (wk?"":`<button class="btn" type="button" id="btnHol"${canWrite?"":" disabled"}>${isHoliday(selDay)?"休業日を解除":"休業日にする"}</button>`)+
     `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+dayTimeline(selDay)+
@@ -1044,7 +1050,7 @@ function dayTimeline(d){
   let ticks="";for(let m=X0+60;m<X1;m+=60)ticks+=`<span class="tk" style="left:${x(m)}px">${m/60}</span>`;
   const lunch=L0!=null&&L1!=null&&L1>L0?`<div class="dtl-lunch" style="left:${x(L0)}px;width:${x(L1)-x(L0)}px"></div>`:"";
   const blk=(p,cls)=>{const c=cars.get(p.cid);if(!c)return"";const nm=(c.customer||"（顧客名なし）")+" "+(c.plate||"");
-    return `<div class="dtl-b ${cls||famOf(c.kubun)}" data-id="${esc(p.cid)}" style="left:${x(p.start)+1}px;width:${Math.max(18,x(p.end)-x(p.start)-2)}px" title="${esc(nm)}　${fmtMin(p.start)}–${fmtMin(p.end)}（${fmt(p.h)}h）${c.kubun?"　"+esc(c.kubun):""}">${esc(nm)}</div>`};
+    return `<div class="dtl-b ${cls||famOf(c.kubun)}" data-id="${esc(p.cid)}" style="--sc:${stVar(c)};left:${x(p.start)+1}px;width:${Math.max(18,x(p.end)-x(p.start)-2)}px" title="${esc(nm)}　${fmtMin(p.start)}–${fmtMin(p.end)}（${fmt(p.h)}h）${c.kubun?"　"+esc(c.kubun):""}　${esc(c.shipped?"出庫済":(c.state||""))}">${esc(nm)}</div>`};
   const now=d===todayISO()?(()=>{const n=new Date(),m=n.getHours()*60+n.getMinutes();return m>X0&&m<X1?`<div class="dtl-now" style="left:${x(m)}px"></div>`:""})():"";
   let h=`<div class="dtl-n">時刻</div><div class="dtl-r dtl-ax" style="width:${W}px">${ticks}</div>`+
     `<div class="dtl-n">空き人数</div><div class="dtl-r dtl-free" style="width:${W}px">${free}</div>`;
