@@ -159,6 +159,29 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .dayp-h h3{margin:0;font-size:16px}
 .dayp-h .sp{flex:1}
 .dayp table tr{cursor:pointer}
+/* その日の時間軸：上の「空き」帯で、何時に何人空いているかが一目でわかる */
+.dtl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.dtl-in{display:grid;grid-template-columns:7.5em max-content;min-width:max-content}
+.dtl-n{position:sticky;left:0;z-index:3;background:var(--surface);padding:0 8px;display:flex;flex-direction:column;justify-content:center;font-size:12.5px;font-weight:700;border-bottom:1px solid var(--line);min-height:34px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtl-n small{font-weight:400;color:var(--muted);font-size:11px}
+.dtl-r{position:relative;border-bottom:1px solid var(--line);min-height:34px;background-image:repeating-linear-gradient(to right,var(--line) 0 1px,transparent 1px 84px),repeating-linear-gradient(to right,transparent 0 41px,color-mix(in srgb,var(--line) 45%,transparent) 41px 42px,transparent 42px 84px)}
+.dtl-ax{height:22px;min-height:22px;background:none}
+.dtl-ax .tk{top:4px}
+.dtl-free{display:flex;height:30px;min-height:30px;background:none}
+.dtl-free span{flex:0 0 42px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:12px;font-weight:700;border-right:1px solid var(--surface);font-variant-numeric:tabular-nums}
+.dtl-free .f0{background:var(--bad-bg);color:var(--bad)} .dtl-free .f1{background:var(--warn-bg);color:var(--warn)} .dtl-free .f2{background:var(--ok-bg);color:var(--ok)}
+.dtl-free .fx{background:var(--sunk);color:var(--muted);font-weight:400}
+.dtl-b{position:absolute;top:4px;height:26px;box-sizing:border-box;border-radius:6px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font-size:11.5px;font-weight:700;padding:0 7px;display:flex;align-items:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:1}
+.dtl-b.k-ten{background:var(--kt-bg);border-color:var(--kt-bd)} .dtl-b.k-sha{background:var(--ks-bg);border-color:var(--ks-bd)} .dtl-b.k-new{background:var(--kn-bg);border-color:var(--kn-bd)} .dtl-b.k-ban{background:var(--kb-bg);border-color:var(--kb-bd)} .dtl-b.k-mnt{background:var(--km-bg);border-color:var(--km-bd)}
+.dtl-b.un{background:var(--surface);color:var(--ink);border:1px dashed var(--muted)}
+.dtl-b:hover{filter:brightness(1.12)}
+.dtl-off{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--sunk) 0 6px,color-mix(in srgb,var(--muted) 22%,var(--sunk)) 6px 8px);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.1em}
+.dtl-lunch{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.dtl-now{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);z-index:2}
+.dtl-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);align-items:center}
+.dtl-sum b{color:var(--ink);font-family:var(--f-mono)}
+.dtl-key{display:inline-flex;gap:4px;align-items:center}
+.dtl-key i{display:inline-block;width:12px;height:12px;border-radius:3px}
 .dayp table tr:hover td{background:var(--sunk)}
 .staff{display:flex;flex-direction:column;gap:6px}
 .staff-head{display:flex;gap:8px;font-size:11.5px;color:var(--muted)}
@@ -851,10 +874,46 @@ function renderDay(){const p=$("dayPanel");if(!selDay){p.hidden=true;return}p.hi
   const rows=L.cars.sort((a,b)=>totalH(b)-totalH(a)).map(c=>`<tr data-id="${esc(c.id)}"><td>${esc(c.customer||"—")}｜${esc(c.plate||"—")}</td><td>${esc(c.kubun||"未選択")}</td><td>${esc(c.vtype||"—")}</td><td class="mono">${fmt(totalH(c))}h</td><td>${esc(c.shipped?"出庫済":(c.state||""))}</td></tr>`).join("");
   p.innerHTML=`<div class="dayp-h"><h3>${md(selDay)}（${"日月火水木金土"[dt.getDay()]}）</h3><span class="hint">${cap?`予約 ${fmt(L.h)}h／キャパ ${fmt(cap)}h（${Math.round(r)}%）・上限まで残り ${fmt(Math.max(0,cap*settings.limit/100-L.h))}h`:"キャパ0hの日"}</span><span class="sp"></span>`+
     (wk?"":`<button class="btn" type="button" id="btnHol"${canWrite?"":" disabled"}>${isHoliday(selDay)?"休業日を解除":"休業日にする"}</button>`)+
-    `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+
+    `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+dayTimeline(selDay)+
     (rows?`<div class="tbl-wrap"><table><thead><tr><th>顧客｜登録番号</th><th>区分</th><th>車型</th><th>工数</th><th>状態</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="hint">この日の入庫予定はありません</p>`)}
+/* その日の時間軸（月間の日付を押すと出る）。SAが電話で入庫時刻を案内するときの目安 */
+function dayTimeline(d){
+  const off=isWeekend(d)||isHoliday(d),ts=settings.techs||[];if(off||!ts.length)return"";
+  const S=toMin(settings.dayStart)??540,L0=toMin(settings.lunchFrom),L1=toMin(settings.lunchTo);
+  const X0=Math.max(7*60,Math.floor(S/60)*60-60),X1=19*60,PX=84/60,W=(X1-X0)*PX,x=m=>Math.max(0,Math.min(W,(m-X0)*PX));
+  const all=liveSegs(),rows=[];
+  for(const t of ts){if(!working(t,d))continue;const cap=techHours(t,d),end=cap?addWork(S,cap*60):null;
+    rows.push({t,cap,end,att:attOf(d,t.name),places:cap?(flowTech(t,all).get(d)||[]):[]})}
+  /* 未割当：その日に工場にいる車両で、担当が決まっていない作業。入庫時刻（なければ始業）から工数分を仮に置く */
+  const unas=[...cars.values()].filter(c=>!c.shipped&&onDay(c,d)).flatMap(segsOf).filter(s=>!s.tech).map(s=>{const c=cars.get(s.cid);
+    const st=c.inDate===d&&toMin(c.inTime)!=null?Math.max(S,toMin(c.inTime)):S;return{...s,start:st,end:addWork(st,Math.round(s.h*60))}}).sort((a,b)=>a.start-b.start);
+  const lanes=[];for(const u of unas){let k=lanes.findIndex(l=>l[l.length-1].end<=u.start);if(k<0){lanes.push([]);k=lanes.length-1}lanes[k].push(u)}
+  /* 30分ごとの空き人数 */
+  let free="",freeH=0;
+  for(let m=X0;m<X1;m+=30){const e=m+30;
+    if(L0!=null&&L1!=null&&m>=L0&&e<=L1){free+=`<span class="fx">昼</span>`;continue}
+    const on=rows.filter(r=>r.cap&&m>=S&&e<=r.end+0.1);
+    if(!on.length){free+=`<span class="fx"></span>`;continue}
+    const n=on.filter(r=>!r.places.some(p=>p.start<e&&p.end>m)).length;freeH+=n*0.5;
+    free+=`<span class="${n===0?"f0":n===1?"f1":"f2"}" title="${fmtMin(m)}〜 空き${n}人／出勤${on.length}人">${n}</span>`}
+  let ticks="";for(let m=X0+60;m<X1;m+=60)ticks+=`<span class="tk" style="left:${x(m)}px">${m/60}</span>`;
+  const lunch=L0!=null&&L1!=null&&L1>L0?`<div class="dtl-lunch" style="left:${x(L0)}px;width:${x(L1)-x(L0)}px"></div>`:"";
+  const blk=(p,cls)=>{const c=cars.get(p.cid);if(!c)return"";const nm=(c.customer||"（顧客名なし）")+" "+(c.plate||"");
+    return `<div class="dtl-b ${cls||famOf(c.kubun)}" data-id="${esc(p.cid)}" style="left:${x(p.start)+1}px;width:${Math.max(18,x(p.end)-x(p.start)-2)}px" title="${esc(nm)}　${fmtMin(p.start)}–${fmtMin(p.end)}（${fmt(p.h)}h）${c.kubun?"　"+esc(c.kubun):""}">${esc(nm)}</div>`};
+  const now=d===todayISO()?(()=>{const n=new Date(),m=n.getHours()*60+n.getMinutes();return m>X0&&m<X1?`<div class="dtl-now" style="left:${x(m)}px"></div>`:""})():"";
+  let h=`<div class="dtl-n">時刻</div><div class="dtl-r dtl-ax" style="width:${W}px">${ticks}</div>`+
+    `<div class="dtl-n">空き人数</div><div class="dtl-r dtl-free" style="width:${W}px">${free}</div>`;
+  for(const r of rows){const st=r.att?ATT[r.att]:"";
+    const body=!r.cap?`<div class="dtl-off" style="left:0;width:${W}px">${esc(st||"作業不可")}</div>`:
+      lunch+(r.end<X1?`<div class="dtl-off" style="left:${x(r.end)}px;width:${W-x(r.end)}px">${r.att==="H"?"半休":""}</div>`:"")+(S>X0?`<div class="dtl-off" style="left:0;width:${x(S)}px"></div>`:"")+r.places.map(p=>blk(p)).join("");
+    h+=`<div class="dtl-n">${esc(r.t.name)}${st?`<small>${esc(st)}</small>`:""}</div><div class="dtl-r" style="width:${W}px">${body}${now}</div>`}
+  lanes.forEach((l,i)=>{h+=`<div class="dtl-n">${i?"":"未割当"}${i?"":`<small>${unas.length}件</small>`}</div><div class="dtl-r" style="width:${W}px">${lunch}${l.map(u=>blk(u,"un")).join("")}</div>`});
+  const unH=unas.reduce((a,u)=>a+u.h,0),net=freeH-unH;
+  return `<div class="dtl-sum"><span>空き時間 合計 <b>${fmt(freeH)}h</b></span>${unH?`<span>未割当の作業 <b>${fmt(unH)}h</b></span><span>割り当て後の空き 見込み <b>${fmt(Math.max(0,net))}h</b></span>`:""}`+
+    `<span class="dtl-key"><i style="background:var(--ok-bg);border:1px solid var(--ok)"></i>2人以上空き</span><span class="dtl-key"><i style="background:var(--warn-bg);border:1px solid var(--warn)"></i>1人空き</span><span class="dtl-key"><i style="background:var(--bad-bg);border:1px solid var(--bad)"></i>空きなし</span></div>`+
+    `<div class="dtl"><div class="dtl-in">${h}</div></div>`}
 $("cal").addEventListener("click",e=>{const b=e.target.closest(".day");if(!b)return;selDay=b.dataset.d;renderMonth();$("dayPanel").scrollIntoView({block:"nearest",behavior:"smooth"})});
-$("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[data-id]");if(tr){openCar(tr.dataset.id);return}
+$("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[data-id],.dtl-b[data-id]");if(tr){openCar(tr.dataset.id);return}
   if(e.target.id==="btnDayAdd")openCar(null,{inDate:selDay});
   if(e.target.id==="btnHol"){try{await patchSettings({holidayMap:{[selDay]:!isHoliday(selDay)}})}catch(err){toast(errText(err))}}});
 $("mPrev").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m-1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
