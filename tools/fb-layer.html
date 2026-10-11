@@ -1,0 +1,137 @@
+<!-- ===== Firebase 版：ログイン画面・メンバー管理・保存先（window.claude の代わり） ===== -->
+<style>
+.login{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+.login[hidden]{display:none!important}
+.login-box{width:min(380px,100%);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:12px}
+.login-box h1{margin:0;font-size:20px}
+.login-box p{margin:0;font-size:13px;color:var(--muted);line-height:1.6}
+.login-box input{padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);color:var(--ink);font:inherit}
+.login-box .err{color:var(--bad);font-size:13px;min-height:1.2em}
+.login-box .lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-size:13px;text-align:left}
+.who{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:4px 16px 0;font-size:12px;color:var(--muted)}
+.who[hidden]{display:none!important}
+.who .lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit}
+.mem-list{display:flex;flex-direction:column;gap:6px;padding:14px 18px}
+.mem-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) auto auto;gap:8px;align-items:center}
+.mem-row input[type=text],.mem-row input[type=email]{padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);color:var(--ink);font:inherit;min-width:0}
+.mem-row .em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-note{padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.6}
+</style>
+<div class="login" id="fbLogin">
+  <form class="login-box" id="fbLoginForm" autocomplete="on">
+    <h1>作業管理ボード</h1>
+    <p id="fbLoginMsg">会社のメールアドレスと、大木さんから受け取ったパスワードでログインしてください。一度ログインすると、次からはこのままボードが開きます。</p>
+    <input type="email" id="fbEmail" placeholder="メールアドレス" autocomplete="username" required>
+    <input type="password" id="fbPass" placeholder="パスワード" autocomplete="current-password" required>
+    <button class="btn primary" type="submit" id="fbLoginBtn">ログイン</button>
+    <div class="err" id="fbErr" role="alert"></div>
+    <button class="lnk" type="button" id="fbForgot">パスワードを忘れたとき</button>
+  </form>
+</div>
+<div class="who" id="fbWho" hidden><span id="fbWhoName"></span><button class="lnk" type="button" id="fbMembers" hidden>メンバー</button><button class="lnk" type="button" id="fbLogout">ログアウト</button></div>
+<dialog id="dlgMem">
+  <div class="d-h"><h3>メンバー</h3><span class="d-act"><span class="note-err" id="memNote" role="alert"></span><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="mem-list" id="memList"></div>
+  <div class="mem-list"><div class="mem-row">
+    <input type="email" id="memEmail" placeholder="メールアドレス"><input type="text" id="memName" placeholder="表示する名前">
+    <label class="tog"><input type="checkbox" id="memAdmin"> 管理者</label><button class="btn primary" type="button" id="memAdd">追加</button>
+  </div></div>
+  <p class="mem-note">ここに入れた人だけがボードを見られます。ログイン用のアカウント（メールアドレスとパスワード）は、Firebaseの画面の「Authentication」→「ユーザーを追加」で別に作ってください。管理者は、メンバーの追加・削除とバックアップからの復元ができます。</p>
+</dialog>
+<script>
+/* 元のアプリは window.claude.use("db") などで保存先を受け取る。Firebase の準備ができるまで待つ約束（Promise）を先に渡す */
+(function(){
+  let ready;const p=new Promise(r=>ready=r);
+  window.__fbReady=ready;
+  window.claude={use:async n=>{const fb=await p;return n==="db"?fb.db:n==="user"?fb.user:n==="downloads"?fb.downloads:null}};
+})();
+</script>
+<script type="module">
+const V="10.12.2";
+const {initializeApp}=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+const A=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
+const F=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+const $=id=>document.getElementById(id);
+const cfg=window.FB_CONFIG;
+if(!cfg||!cfg.apiKey||/ここに/.test(cfg.apiKey)){$("fbLoginMsg").textContent="Firebaseの設定がまだ入っていません。（FB_CONFIG を入れてください）";$("fbLoginForm").querySelectorAll("input,button").forEach(x=>x.disabled=true);throw new Error("no config")}
+const app=initializeApp(cfg);
+const auth=A.getAuth(app);
+let fs;try{fs=F.initializeFirestore(app,{ignoreUndefinedProperties:true,localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){fs=F.initializeFirestore(app,{ignoreUndefinedProperties:true})}
+
+/* ---------- エラーの言いかえ（元のアプリの errText に合わせる） ---------- */
+const wrapErr=e=>{const c=e&&e.code||"";const code=c==="permission-denied"?"invalid_argument":c==="resource-exhausted"?"quota_exceeded":c==="not-found"?"not_found":c==="unavailable"||c==="deadline-exceeded"?"unavailable":c;return Object.assign(new Error(e&&e.message||String(e)),{code})};
+const W=fn=>async(...a)=>{try{return await fn(...a)}catch(e){throw wrapErr(e)}};
+const isPlain=x=>x&&typeof x==="object"&&!Array.isArray(x)&&Object.getPrototypeOf(x)===Object.prototype;
+/* update は「入れた部分だけ」を変える（勤務表・連絡記録などを同時に別の人が変えても消えないように） */
+function flatten(obj,pre,out){for(const k of Object.keys(obj)){const v=obj[k],path=[...pre,k];if(v===undefined)continue;
+  if(isPlain(v)&&Object.keys(v).length)flatten(v,path,out);else out.push([path,v])}return out}
+
+/* ---------- 保存先 ---------- */
+const snapDoc=s=>({id:s.id,exists:s.exists(),data:()=>s.data()});
+function docRef(path){const ref=F.doc(fs,...path.split("/"));return{
+  get:W(async()=>snapDoc(await F.getDoc(ref))),
+  set:W(async d=>{await F.setDoc(ref,d)}),
+  update:W(async d=>{const pairs=flatten(d,[],[]);if(!pairs.length)return;const args=[];for(const[p,v]of pairs)args.push(new F.FieldPath(...p),v);await F.updateDoc(ref,...args)}),
+  delete:W(async()=>{await F.deleteDoc(ref)}),
+  onSnapshot:(next,err)=>F.onSnapshot(ref,s=>next(snapDoc(s)),e=>err&&err(wrapErr(e)))}}
+const db={
+  collection:name=>({doc:id=>docRef(name+"/"+id),
+    onSnapshot:(next,err)=>F.onSnapshot(F.collection(fs,name),s=>next({docs:s.docs.map(d=>({id:d.id,exists:true,data:()=>d.data()}))}),e=>err&&err(wrapErr(e)))}),
+  doc:path=>docRef(path)};
+
+/* ---------- メンバー（名前・管理者） ---------- */
+let members=new Map(),me=null,memReady,memLoaded=new Promise(r=>memReady=r);
+const nameOf=em=>{const m=members.get(String(em||"").toLowerCase());return m&&m.name||String(em||"").split("@")[0]};
+const user={
+  id:async()=>me,
+  can:async()=>true,
+  canEdit:async()=>{await memLoaded;return !!(members.get(me)||{}).admin},
+  isOwner:async()=>false,
+  profiles:async ids=>{await memLoaded;return Object.fromEntries((ids||[]).map(i=>[i,{id:i,name:/@/.test(i)?nameOf(i):""}]))},
+  me:async()=>({id:me,name:nameOf(me),email:me})};
+const downloads={save:async({filename,data})=>{const blob=data instanceof Blob?data:new Blob([data],{type:/\.json$/i.test(filename)?"application/json":"text/plain"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}};
+
+/* ---------- ログイン ---------- */
+const loginMsg={"auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスのアカウントがありません。大木さんに連絡してください。","auth/too-many-requests":"何度も失敗したため、しばらくログインできません。少し待ってからやり直してください。","auth/network-request-failed":"インターネットにつながっていません。","auth/invalid-email":"メールアドレスの形が正しくありません。"};
+$("fbLoginForm").addEventListener("submit",async e=>{e.preventDefault();$("fbErr").textContent="";$("fbLoginBtn").disabled=true;
+  try{await A.signInWithEmailAndPassword(auth,$("fbEmail").value.trim(),$("fbPass").value)}catch(err){$("fbErr").textContent=loginMsg[err.code]||"ログインできませんでした。（"+(err.code||err.message)+"）"}
+  finally{$("fbLoginBtn").disabled=false}});
+$("fbForgot").addEventListener("click",async()=>{const em=$("fbEmail").value.trim();if(!em){$("fbErr").textContent="先にメールアドレスを入れてから押してください。";return}
+  try{await A.sendPasswordResetEmail(auth,em);$("fbErr").textContent="パスワードを決め直すメールを送りました。届かないときは迷惑メールも確認し、それでもなければ大木さんに連絡してください。"}catch(err){$("fbErr").textContent=loginMsg[err.code]||"送れませんでした。大木さんに連絡してください。"}});
+$("fbLogout").addEventListener("click",async()=>{await A.signOut(auth);location.reload()});
+
+let started=false;
+A.onAuthStateChanged(auth,async u=>{
+  if(!u){$("fbLogin").hidden=false;$("fbWho").hidden=true;return}
+  me=String(u.email||"").toLowerCase();
+  /* メンバー表に入っている人だけが使える（Firestore のルールでも同じように止めている） */
+  let ok=true;
+  try{const s=await F.getDoc(F.doc(fs,"members",me));ok=s.exists();
+    /* 最初の1回：管理者（ルールに書いた人）だけは、自分をメンバー表に入れられる */
+    if(!ok){try{await F.setDoc(F.doc(fs,"members",me),{name:me.split("@")[0],admin:true});ok=true}catch(e){ok=false}}}
+  catch(e){ok=false}
+  if(!ok){$("fbLogin").hidden=false;$("fbErr").textContent="このアカウントはまだメンバーに入っていません。大木さんに連絡してください。";await A.signOut(auth);return}
+  F.onSnapshot(F.collection(fs,"members"),s=>{members=new Map(s.docs.map(d=>[d.id,d.data()]));memReady();renderWho();if($("dlgMem").open)renderMem()},()=>{});
+  $("fbLogin").hidden=true;
+  if(!started){started=true;window.__fbReady({db,user,downloads})}
+});
+function renderWho(){const adm=!!(members.get(me)||{}).admin;$("fbWho").hidden=false;$("fbWhoName").textContent=nameOf(me)+" さん";$("fbMembers").hidden=!adm}
+
+/* ---------- メンバー管理（管理者だけ） ---------- */
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function renderMem(){const rows=[...members.entries()].sort((a,b)=>String(a[1].name||a[0]).localeCompare(String(b[1].name||b[0]),"ja"));
+  $("memList").innerHTML=rows.map(([em,m])=>`<div class="mem-row" data-em="${esc(em)}"><span class="em" title="${esc(em)}">${esc(em)}</span><input type="text" value="${esc(m.name||"")}" data-k="name" aria-label="表示する名前"><label class="tog"><input type="checkbox" data-k="admin" ${m.admin?"checked":""} ${em===me?"disabled":""}> 管理者</label><button class="btn" type="button" data-del ${em===me?"disabled":""}>外す</button></div>`).join("")}
+$("fbMembers").addEventListener("click",()=>{$("memNote").textContent="";renderMem();$("dlgMem").showModal()});
+$("dlgMem").addEventListener("click",e=>{if(e.target.matches("[data-close]"))$("dlgMem").close()});
+$("memList").addEventListener("change",async e=>{const row=e.target.closest(".mem-row");if(!row)return;const em=row.dataset.em,k=e.target.dataset.k;
+  try{await F.updateDoc(F.doc(fs,"members",em),k==="admin"?{admin:e.target.checked}:{name:e.target.value.trim()})}catch(err){$("memNote").textContent="保存できませんでした（管理者だけが変更できます）"}});
+let delArmed=null;
+$("memList").addEventListener("click",async e=>{if(!e.target.matches("[data-del]"))return;const em=e.target.closest(".mem-row").dataset.em;
+  if(delArmed!==em){delArmed=em;e.target.textContent="本当に外す";return}delArmed=null;
+  try{await F.deleteDoc(F.doc(fs,"members",em))}catch(err){$("memNote").textContent="外せませんでした（管理者だけが変更できます）"}});
+$("memAdd").addEventListener("click",async()=>{const em=$("memEmail").value.trim().toLowerCase(),nm=$("memName").value.trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){$("memNote").textContent="メールアドレスを確認してください";return}
+  try{await F.setDoc(F.doc(fs,"members",em),{name:nm||em.split("@")[0],admin:$("memAdmin").checked});$("memEmail").value="";$("memName").value="";$("memAdmin").checked=false;$("memNote").textContent=""}
+  catch(err){$("memNote").textContent="追加できませんでした（管理者だけが変更できます）"}});
+</script>

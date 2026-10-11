@@ -1,0 +1,1243 @@
+<title>作業管理ボード</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: sticky header with summary chips, then a horizontally scrolling board of six state columns; dialogs for paste and card detail */
+:root{
+  --bg:#eceff3; --surface:#ffffff; --sunk:#f5f7f9; --ink:#17212b; --muted:#5b6876; --line:#d2d8df;
+  --accent:#1c4d8c; --accent-ink:#ffffff;
+  --warn:#b86e00; --warn-bg:#fff3df; --bad:#b9322a; --bad-bg:#fde9e7; --ok:#2c7a4b; --ok-bg:#e4f4ea;
+  --s0:#8a6d3b; --s1:#6b7a89; --s2:#2f6fbf; --s3:#1f8a7a; --s4:#c47f00; --s5:#7b5bb5; --s6:#2c7a4b;
+  --f-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --surface:#19212a; --sunk:#141b22; --ink:#e5eaf0; --muted:#94a2b0; --line:#2c3844;
+  --accent:#78a6e6; --accent-ink:#0d1620;
+  --warn:#f0a83c; --warn-bg:#3a2a10; --bad:#f06c60; --bad-bg:#3d1b18; --ok:#5ec18b; --ok-bg:#16301f;
+  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --surface:#19212a; --sunk:#141b22; --ink:#e5eaf0; --muted:#94a2b0; --line:#2c3844;
+  --accent:#78a6e6; --accent-ink:#0d1620;
+  --warn:#f0a83c; --warn-bg:#3a2a10; --bad:#f06c60; --bad-bg:#3d1b18; --ok:#5ec18b; --ok-bg:#16301f;
+  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; color-scheme:dark}
+/* 区分の色：3か月点検系=青 / 車検系=赤 / 新車=黄 / 板金=ピンク / メンテ単独=緑 / 一般=白 */
+:root{--kt-bg:#e4eefb;--kt-bd:#9dbde8;--kt-ink:#1c4d8c;--ks-bg:#fce7e5;--ks-bd:#eba59d;--ks-ink:#b0302a;--kn-bg:#fff5c7;--kn-bd:#e2c443;--kn-ink:#7d6100;--kb-bg:#fde8f2;--kb-bd:#eda4c6;--kb-ink:#a8306a;--km-bg:#e3f3e9;--km-bd:#93c9a6;--km-ink:#2c7a4b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--kt-bg:#17283d;--kt-bd:#2f5383;--kt-ink:#8fb8ef;--ks-bg:#371a19;--ks-bd:#7a3530;--ks-ink:#f28a80;--kn-bg:#332b0e;--kn-bd:#7a6720;--kn-ink:#ecd067;--kb-bg:#381a2a;--kb-bd:#7c3559;--kb-ink:#f19ac3;--km-bg:#16301f;--km-bd:#2f6844;--km-ink:#6fcf98}}
+:root[data-theme="dark"]{--kt-bg:#17283d;--kt-bd:#2f5383;--kt-ink:#8fb8ef;--ks-bg:#371a19;--ks-bd:#7a3530;--ks-ink:#f28a80;--kn-bg:#332b0e;--kn-bd:#7a6720;--kn-ink:#ecd067;--kb-bg:#381a2a;--kb-bd:#7c3559;--kb-ink:#f19ac3;--km-bg:#16301f;--km-bd:#2f6844;--km-ink:#6fcf98}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+.brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.02em}
+.brand .date{color:var(--muted);font-family:var(--f-mono);font-size:13px}
+.summary{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12px;white-space:nowrap}
+.chip b{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.chip.warn{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.chip.bad{background:var(--bad-bg);border-color:transparent;color:var(--bad)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.actions input[type=search]{width:220px;max-width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.tog{display:inline-flex;gap:6px;align-items:center;color:var(--muted);font-size:13px;cursor:pointer}
+.btn{padding:7px 14px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.banner{margin:10px 16px 0;padding:8px 12px;border-radius:var(--r);background:var(--warn-bg);color:var(--warn);font-size:13px}
+.board-wrap{overflow-x:auto;padding:14px 16px 24px}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:12px;min-height:60vh}
+@media (max-width:700px){.board{grid-auto-columns:82vw}.board-wrap{scroll-snap-type:x mandatory}.col{scroll-snap-align:start}.actions input[type=search]{width:100%}.actions{width:100%}}
+.col{background:var(--sunk);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;min-width:0}
+.col.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.col-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.col-h .dot{width:10px;height:10px;border-radius:50%;background:var(--sc)}
+.col-h h2{font-size:14px;margin:0;font-weight:700}
+.col-h .n{margin-left:auto;font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cards{display:flex;flex-direction:column;gap:8px;padding:10px;flex:1}
+.empty{color:var(--muted);font-size:12px;text-align:center;padding:18px 6px;border:1px dashed var(--line);border-radius:var(--r)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:4px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.card:hover{border-color:var(--muted)}
+.card.dragging{opacity:.4}
+.card.shipped{opacity:.6}
+.c-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kubun{display:inline-block;white-space:nowrap;vertical-align:1px;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;background:var(--sunk);border:1px solid var(--line)}
+.card.k-ten{background:var(--kt-bg);border-color:var(--kt-bd)} .k-ten .kubun{color:var(--kt-ink);border-color:var(--kt-bd);background:var(--surface)}
+.card.k-sha{background:var(--ks-bg);border-color:var(--ks-bd)} .k-sha .kubun{color:var(--ks-ink);border-color:var(--ks-bd);background:var(--surface)}
+.card.k-new{background:var(--kn-bg);border-color:var(--kn-bd)} .k-new .kubun{color:var(--kn-ink);border-color:var(--kn-bd);background:var(--surface)}
+.card.k-ban{background:var(--kb-bg);border-color:var(--kb-bd)} .k-ban .kubun{color:var(--kb-ink);border-color:var(--kb-bd);background:var(--surface)}
+.card.k-mnt{background:var(--km-bg);border-color:var(--km-bd)} .k-mnt .kubun{color:var(--km-ink);border-color:var(--km-bd);background:var(--surface)}
+.wip{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.plate{font-size:14.5px;font-weight:700;overflow-wrap:anywhere;line-height:1.4}
+.plate .sep{color:var(--muted);font-weight:400;margin:0 3px}
+.c-foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.due{font-family:var(--f-mono);font-size:12px;padding:1px 6px;border-radius:4px;background:var(--sunk);font-variant-numeric:tabular-nums}
+.due.today{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.due.late{background:var(--bad-bg);color:var(--bad);font-weight:600}
+.tag{font-size:11.5px;color:var(--muted)}
+.tag.parts{color:var(--s5)}
+.tag.loan.on{color:var(--ink);font-weight:700}
+.req .lbl{font-size:11px;font-weight:700;color:var(--muted);margin-right:6px}
+.req .none{color:var(--muted)}
+.req{font-size:12px;color:var(--ink);opacity:.85;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#dlgSet{width:min(1240px,calc(100vw - 32px))}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(10,15,20,.45)}
+.d-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.d-h h3{margin:0;font-size:16px}
+.d-h .x{margin-left:auto}
+.d-act{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.d-b{padding:16px 18px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.d-f{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px;border-top:1px solid var(--line);align-items:center}
+.d-f .sp{flex:1}
+.hint{color:var(--muted);font-size:12.5px;margin:0}
+.note-err{color:var(--bad);font-size:13px;font-weight:700}
+textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:8px 10px;resize:vertical}
+#pasteBox{min-height:110px;font-family:var(--f-mono);font-size:12px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--sunk);font-weight:700;color:var(--muted)}
+td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.st{font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px}
+.st.ok{background:var(--ok-bg);color:var(--ok)} .st.dup{background:var(--sunk);color:var(--muted)} .st.bad{background:var(--bad-bg);color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label{font-size:12px;color:var(--muted);font-weight:700}
+.fld input,.fld select{border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:7px 9px;min-width:0}
+.fld input[readonly]{opacity:.7}
+.full{grid-column:1/-1}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.seg button::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sc)}
+.seg button[aria-pressed=true]{border-color:var(--sc);background:var(--sunk);font-weight:700}
+.check{display:inline-flex;gap:8px;align-items:center;cursor:pointer}
+.log{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto}
+.log-i{background:var(--sunk);border-radius:var(--r);padding:6px 9px;font-size:12.5px}
+.log-i .when{font-family:var(--f-mono);color:var(--muted);font-size:11.5px;margin-right:8px}
+.log-add{display:flex;gap:8px}
+.log-add input{flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:7px 9px}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.tabs button{border:0;background:transparent;padding:6px 14px;cursor:pointer;font-weight:700;color:var(--muted)}
+.tabs button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.hbox{background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:13px;gap:2px}
+.hbox b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.hbox .ok{color:var(--ok)} .hbox .warn{color:var(--warn)} .hbox .over{color:var(--bad)}
+.month{padding-block:14px 28px;padding-inline:16px;display:flex;flex-direction:column;gap:12px}
+.m-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.m-bar h2{margin:0 4px;font-size:18px;min-width:7.5em;text-align:center;font-variant-numeric:tabular-nums}
+.m-sum{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.lg{width:14px;height:8px;border-radius:2px;display:inline-block}
+.lg.ok{background:var(--ok)} .lg.warn{background:var(--warn)} .lg.over{background:var(--bad)} .lg.lim{width:2px;height:12px;background:var(--ink)}
+.cal-wrap{overflow-x:auto}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(84px,1fr));gap:6px;min-width:640px}
+.cal .wd{font-size:12px;font-weight:700;color:var(--muted);text-align:center;padding:2px 0}
+.cal .wd.sun{color:var(--bad)} .cal .wd.sat{color:var(--s2)}
+.day{display:flex;flex-direction:column;gap:5px;align-items:stretch;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:7px 8px;min-height:86px;cursor:pointer}
+.day:hover{border-color:var(--muted)}
+.day.out{opacity:.35}
+.day.off{background:var(--sunk)}
+.day.sel{outline:2px solid var(--accent);outline-offset:1px}
+.day.today .dn{background:var(--accent);color:var(--accent-ink);border-radius:4px;padding:0 5px}
+.d-top{display:flex;justify-content:space-between;align-items:baseline;gap:4px}
+.dn{font-family:var(--f-mono);font-weight:600;font-size:13px}
+.cnt{font-size:12px;color:var(--muted)}
+.bar{position:relative;height:8px;background:var(--sunk);border-radius:4px;overflow:visible;border:1px solid var(--line)}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.bar .lim{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.7}
+.day.lv-ok .bar i{background:var(--ok)} .day.lv-warn .bar i{background:var(--warn)} .day.lv-over .bar i{background:var(--bad)}
+.dh{font-family:var(--f-mono);font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.day.lv-warn .dh .p{color:var(--warn);font-weight:600} .day.lv-over .dh .p{color:var(--bad);font-weight:600} .day.lv-ok .dh .p{color:var(--ok);font-weight:600}
+.offlbl{font-size:11.5px;color:var(--muted)}
+.dayp{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.dayp-h{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.dayp-h h3{margin:0;font-size:16px}
+.dayp-h .sp{flex:1}
+.dayp table tr{cursor:pointer}
+.dayp table tr:hover td{background:var(--sunk)}
+.staff{display:flex;flex-direction:column;gap:6px}
+.staff-head{display:flex;gap:8px;font-size:11.5px;color:var(--muted)}
+.staff-head span:nth-child(1){width:9em}.staff-head span:nth-child(2){width:6.5em}
+.staff-row input[type=text]{width:8em}
+.att{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.att-h{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.att-h h3{margin:0;font-size:16px}
+.att-wrap{overflow-x:auto}
+.att table{border-collapse:separate;border-spacing:3px;width:auto;font-size:12px}
+.att th,.att td{padding:0;border:0;text-align:center;white-space:nowrap}
+.att th{background:transparent;font-weight:700;color:var(--muted);padding:2px 0;min-width:30px}
+.att th.nm{text-align:left;padding-right:8px;position:sticky;left:0;background:var(--surface);z-index:1;color:var(--ink);min-width:7em}
+.att th .w{display:block;font-size:10.5px;font-weight:400}
+.att th.we{color:var(--bad)}
+.att td button{width:30px;height:26px;border-radius:4px;border:0;cursor:pointer;font-family:var(--f-mono);font-weight:600;font-size:12px;color:#fff;background:var(--ok)}
+.att td button.V,.att td button.T{background:var(--warn);color:#fff}
+.att td button.H{background:linear-gradient(135deg,var(--ok) 50%,var(--warn) 50%)}
+.att td button.na{background:var(--sunk);color:var(--muted);cursor:default}
+.att td.off{background:var(--sunk);border-radius:4px;width:30px;height:26px}
+.att td.tot{font-family:var(--f-mono);font-weight:600;background:var(--sunk);border-radius:4px;height:26px;font-variant-numeric:tabular-nums}
+.att-h .sp{flex:1}
+.loan-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.loan-row select,.loan-row input{border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:7px 9px;min-width:0}
+.loan-row select{flex:1 1 220px}
+#loanInfo .over{color:var(--bad);font-weight:700}
+.ln{display:grid;column-gap:3px;row-gap:3px;align-items:stretch;margin-bottom:6px}
+.ln .nm{position:sticky;left:0;z-index:2;background:var(--surface);font-weight:700;font-size:12.5px;display:flex;align-items:center;padding-right:8px}
+.ln .dh2{font-size:11px;color:var(--muted);text-align:center;line-height:1.2}
+.ln .dh2.we{color:var(--bad)}
+.ln .bg{background:var(--sunk);border-radius:4px}
+.ln .bg.we{opacity:.45}
+.ln .bg.td{outline:2px solid var(--accent);outline-offset:-2px}
+.ln .lb{z-index:1;border-radius:4px;font-size:11.5px;padding:0 6px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid var(--kt-bd);background:var(--kt-bg);color:var(--kt-ink);min-height:22px;text-align:left}
+.ln .lb.man{border-color:var(--line);background:var(--surface);color:var(--ink);border-style:dashed}
+.ln .lb.rent{border-color:var(--kn-bd);background:var(--kn-bg);color:var(--kn-ink)}
+.ln .lb.clash{border-color:var(--bad);background:var(--ks-bg);color:var(--ks-ink);font-weight:700}
+.ln .lb.done{opacity:.55}
+.pdate{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:6px 8px}
+.pv{display:flex;flex-direction:column;gap:6px}
+.pr{display:grid;grid-template-columns:13em minmax(0,1fr);gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.pr.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.pr.unas{background:var(--sunk)}
+.pr-h{display:flex;flex-direction:column;gap:4px;min-width:0;justify-content:center}
+.pr-h .nm{font-weight:700;font-size:14px}
+.pr-h .st{font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;background:var(--warn-bg);color:var(--warn);margin-left:6px}
+.pr-h .ld{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pr-h .ld .p{font-weight:600}
+.pbar{position:relative;height:6px;background:var(--sunk);border-radius:3px;border:1px solid var(--line)}
+.pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--ok)}
+.pr.lv-warn .pbar i{background:var(--warn)} .pr.lv-over .pbar i{background:var(--bad)}
+.pr.lv-ok .ld .p{color:var(--ok)} .pr.lv-warn .ld .p{color:var(--warn)} .pr.lv-over .ld .p{color:var(--bad)}
+.pr-c{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;align-content:flex-start;min-width:0}
+.pr-c .none{color:var(--muted);font-size:12px;align-self:center}
+.pc{display:flex;flex-direction:column;justify-content:center;gap:1px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:grab;font-size:12.5px;min-width:0;max-width:100%;flex:0 0 auto;text-align:left}
+.pc:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pc .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc .s{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc.dragging{opacity:.4}
+.pc.done{opacity:.6}
+.pc.k-ten{background:var(--kt-bg);border-color:var(--kt-bd)} .pc.k-sha{background:var(--ks-bg);border-color:var(--ks-bd)} .pc.k-new{background:var(--kn-bg);border-color:var(--kn-bd)} .pc.k-ban{background:var(--kb-bg);border-color:var(--kb-bd)} .pc.k-mnt{background:var(--km-bg);border-color:var(--km-bd)}
+.pv{overflow-x:auto;padding-bottom:4px}
+.pv>.pr,.pv>.axis{width:max-content;min-width:100%}
+.pr{grid-template-columns:13em max-content}
+.pr-h{position:sticky;left:0;z-index:3;background:inherit}
+.pr.unas .pr-c{width:924px}
+.axis{display:grid;grid-template-columns:13em max-content;gap:10px;padding:0 10px;position:sticky;top:0;z-index:4}
+.ax{position:relative;height:18px}
+.tk{position:absolute;top:0;transform:translateX(-50%);font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.pr-b{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tl{position:relative;height:58px;border-radius:6px;background-color:var(--sunk);background-image:repeating-linear-gradient(to right,var(--line) 0 1px,transparent 1px 84px),repeating-linear-gradient(to right,transparent 0 41px,color-mix(in srgb,var(--line) 50%,transparent) 41px 42px,transparent 42px 84px)}
+.pr.closed{background:var(--sunk)}
+.pr.closed .pr-h .nm{color:var(--muted)}
+.tl.closed{background-color:var(--sunk);background-image:repeating-linear-gradient(45deg,transparent 0 8px,color-mix(in srgb,var(--muted) 24%,transparent) 8px 10px);cursor:not-allowed}
+.closed-fill{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;letter-spacing:.2em;color:var(--muted)}
+.closed-fill span{background:var(--sunk);padding:2px 16px;border-radius:4px;border:1px solid var(--line)}
+.after{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,transparent 0 6px,color-mix(in srgb,var(--muted) 20%,transparent) 6px 8px);display:flex;align-items:center;justify-content:center}
+.after span{font-size:12px;font-weight:700;color:var(--muted);background:var(--sunk);padding:1px 8px;border-radius:4px}
+.tl .none{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted)}
+.carry .cl.late{color:var(--bad)}
+.pc.blk.cont{border-left:3px dashed var(--muted);border-top-left-radius:2px;border-bottom-left-radius:2px}
+.pc.blk.more{border-right:3px dashed var(--muted);border-top-right-radius:2px;border-bottom-right-radius:2px}
+.segrows{display:flex;flex-direction:column;gap:6px}
+.segrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.segrow .sl{font-weight:700;font-size:13px;min-width:3.5em}
+.segrow input,.segrow select{border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:6px 8px}
+.segrow input{width:5em}
+.segrow .sh{font-family:var(--f-mono);font-size:13px;min-width:6.5em}
+.seg-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lunch{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,transparent 0 5px,color-mix(in srgb,var(--muted) 18%,transparent) 5px 7px)}
+.capmk{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--bad);z-index:2}
+.capmk::after{content:"終業";position:absolute;top:-14px;left:3px;font-size:10px;color:var(--bad);white-space:nowrap}
+.pc.blk{position:absolute;top:4px;bottom:4px;padding:3px 7px;overflow:hidden;z-index:1;box-sizing:border-box}
+.pc.blk.ovr{box-shadow:inset 0 -3px 0 var(--bad)}
+.pc.blk .rz{position:absolute;right:0;top:0;bottom:0;width:9px;cursor:ew-resize;touch-action:none;z-index:3}
+.pc.blk .rz::after{content:"";position:absolute;right:3px;top:50%;height:16px;margin-top:-8px;border-left:2px solid currentColor;opacity:.35}
+.pc.blk:hover .rz::after{opacity:.8}
+.pc.blk.sizing{z-index:4;box-shadow:0 0 0 2px var(--accent)}
+.dropmk{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:5;pointer-events:none}
+.dropmk span{position:absolute;top:-15px;left:3px;font-size:10px;font-weight:700;color:var(--accent);white-space:nowrap;background:var(--surface);padding:0 3px;border-radius:3px}
+.spill{position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--bad);background:var(--surface);padding:0 4px;border-radius:3px;z-index:2}
+.carry{display:flex;flex-wrap:wrap;gap:5px;align-items:center;max-width:924px}
+.carry .cl{font-size:11px;font-weight:700;color:var(--muted)}
+.carry .pc{padding:3px 7px}
+.tip{position:fixed;z-index:30;width:280px;max-width:calc(100vw - 24px);pointer-events:none}
+.tip .card{box-shadow:0 8px 24px rgba(0,0,0,.2)}
+@media (max-width:640px){.pr{grid-template-columns:1fr}}
+.att .lgd{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.staff-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.staff-row input{border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:6px 8px}
+.staff-row input[type=number]{width:5em}
+.grow{flex:1}
+.hsec{display:flex;flex-direction:column;gap:10px}
+.hsearch{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr)) auto;gap:10px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
+.hsearch input{border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:7px 9px;min-width:0}
+.htbl{background:var(--surface)}
+.htbl th.r,.htbl td.r{text-align:right}
+.htbl td.wrap{white-space:normal;min-width:16em}
+.htbl tbody tr[data-id],.htbl tbody tr[data-bill]{cursor:pointer}
+.htbl tbody tr[data-id]:hover td,.htbl tbody tr[data-bill]:hover td{background:var(--sunk)}
+.htbl tfoot th{background:var(--sunk);text-align:left}
+.htbl tr.txt td{background:var(--sunk)}
+.htbl input{border:1px solid var(--line);border-radius:4px;background:var(--sunk);padding:4px 6px;width:9em}
+#dlgInv,#dlgInvView{width:min(1100px,calc(100vw - 32px))}
+.invinfo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px;margin:0}
+.invinfo dt{font-size:11.5px;color:var(--muted);font-weight:700}
+.invinfo dd{margin:0;font-size:13.5px}
+.invtot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:flex-end;font-family:var(--f-mono);font-size:13px}
+.invtot b{font-size:15px}
+.chist{display:flex;flex-direction:column;gap:4px}
+.chrow{display:grid;grid-template-columns:7em 1fr auto;gap:10px;text-align:left;border:1px solid var(--line);background:var(--sunk);border-radius:var(--r);padding:6px 9px;cursor:pointer;font-size:12.5px}
+.chrow:hover{border-color:var(--muted)}
+.rsbox{display:flex;flex-direction:column;gap:8px;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.rsbox p{margin:0;font-size:13px}
+#bkFallback{display:flex;gap:8px;align-items:flex-start}
+.log-i .who{font-weight:700;font-size:11.5px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:20;max-width:calc(100vw - 32px)}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .12s}}
+</style>
+
+<header class="top">
+  <div class="brand"><h1>作業管理ボード</h1><span class="date" id="today"></span></div>
+  <div class="tabs"><button type="button" id="tabBoard" aria-pressed="true">ボード</button><button type="button" id="tabPerson" aria-pressed="false">個人</button><button type="button" id="tabMonth" aria-pressed="false">月間</button><button type="button" id="tabHist" aria-pressed="false">履歴</button></div>
+  <div class="summary" id="summary"></div>
+  <div class="actions">
+    <input type="search" id="q" placeholder="登録番号・顧客・WIPで検索" aria-label="検索">
+    <label class="tog"><input type="checkbox" id="showShipped"> 出庫済を表示</label>
+    <button class="btn" id="btnAdd" type="button">1台追加</button>
+    <button class="btn primary" id="btnPaste" type="button">DMSから貼り付け</button>
+  </div>
+</header>
+<div class="banner" id="banner" hidden></div>
+<main class="board-wrap" id="boardView"><div class="board" id="board"></div></main>
+<main class="month" id="personView" hidden>
+  <div class="m-bar">
+    <button class="btn" type="button" id="pPrev" aria-label="前の日">‹</button>
+    <h2 id="pTitle"></h2>
+    <button class="btn" type="button" id="pNext" aria-label="次の日">›</button>
+    <button class="btn" type="button" id="pToday">今日</button>
+    <input type="date" id="pDate" aria-label="日付を選ぶ" class="pdate">
+    <div class="m-sum" id="pSum"></div>
+  </div>
+  <p class="hint">その日に工場にいる車両を、担当ごとに並べています。担当ごとに、並び順で始業時刻から工数分を詰めて時間軸に置きます。昼休みは飛ばし、終業を超えた分は次の作業日へ自動で引き継ぎます（休み・研修の日も飛ばします）。置いた作業は、ドラッグで好きな時刻へ動かせます（15分きざみ。その時刻に固定されます）。作業の右端をドラッグすると長さを変えられます。別の人の行へドラッグすると担当が変わり、未割当へ戻すと時刻の指定も消えます。1台の作業を途中で止めて別の車両を入れたい時は、カードを開いて「作業を分ける」で作業1・作業2に分けてから並べ替えてください。</p>
+  <div class="pv" id="pv"></div>
+</main>
+<main class="month" id="histView" hidden>
+  <div class="m-bar">
+    <div class="tabs"><button type="button" id="hsList" aria-pressed="true">整備履歴</button><button type="button" id="hsBill" aria-pressed="false">月別請求</button></div>
+    <span class="grow"></span>
+    <button class="btn primary" type="button" id="btnInvImport">請求書を取り込む</button>
+  </div>
+  <section id="hList" class="hsec">
+    <div class="hsearch">
+      <div class="fld"><label for="hq_c">顧客名（一部でも可）</label><input id="hq_c" type="search" placeholder="例：関西 ジェット"></div>
+      <div class="fld"><label for="hq_p">登録番号（一部でも可）</label><input id="hq_p" type="search" placeholder="例：123"></div>
+      <div class="fld"><label for="hq_ch">シャシNo（一部でも可）</label><input id="hq_ch" type="search" placeholder="例：5515"></div>
+      <div class="fld"><label for="hq_w">作業内容・部品</label><input id="hq_w" type="search" placeholder="例：エアベローズ"></div>
+      <button class="btn" type="button" id="hqClear">クリア</button>
+    </div>
+    <p class="hint" id="hCount"></p>
+    <div class="tbl-wrap"><table class="htbl"><thead><tr><th>発行日</th><th>顧客名</th><th>登録番号</th><th>シャシNo</th><th class="r">走行距離</th><th>作業内容</th><th class="r">請求金額</th></tr></thead><tbody id="hBody"></tbody></table></div>
+  </section>
+  <section id="hBill" class="hsec" hidden>
+    <div class="m-bar"><button class="btn" type="button" id="bPrev" aria-label="前の月">‹</button><h2 id="bTitle"></h2><button class="btn" type="button" id="bNext" aria-label="次の月">›</button><div class="m-sum" id="bSum"></div></div>
+    <p class="hint">請求書の発行日の月で、請求先ごとに集計しています。行を押すとその請求先の履歴を表示します。</p>
+    <div class="tbl-wrap"><table class="htbl"><thead><tr><th>請求先</th><th class="r">件数</th><th class="r">部品</th><th class="r">作業</th><th class="r">外注</th><th class="r">税抜</th><th class="r">消費税</th><th class="r">請求金額</th></tr></thead><tbody id="bBody"></tbody><tfoot id="bFoot"></tfoot></table></div>
+  </section>
+</main>
+<main class="month" id="monthView" hidden>
+  <div class="m-bar">
+    <button class="btn" type="button" id="mPrev" aria-label="前の月">‹</button>
+    <h2 id="mTitle"></h2>
+    <button class="btn" type="button" id="mNext" aria-label="次の月">›</button>
+    <button class="btn" type="button" id="mToday">今月</button>
+    <div class="m-sum" id="mSum"></div>
+    <button class="btn" type="button" id="btnSettings">キャパ設定</button>
+  </div>
+  <section class="att">
+    <div class="att-h"><h3>代車予定</h3><span class="hint">代車ありのカードは入庫日〜出庫日で自動表示。棒を押すと内容が開きます。赤は同じ代車の重複です。</span><span class="sp"></span><button class="btn" type="button" id="btnLoanAdd">代車予定を追加</button></div>
+    <div class="att-wrap" id="loanGrid"></div>
+  </section>
+  <div class="legend"><span><i class="lg ok"></i>上限以内</span><span><i class="lg warn"></i>上限超え（100%まで）</span><span><i class="lg over"></i>100%超え</span><span><i class="lg lim"></i>予約上限</span><span class="hint">工数は入庫日に計上</span></div>
+  <div class="cal-wrap"><div class="cal" id="cal"></div></div>
+  <section class="dayp" id="dayPanel" hidden></section>
+</main>
+
+
+<dialog id="dlgPaste">
+  <div class="d-h"><h3>DMSから貼り付け</h3><button class="btn x" type="button" data-close>閉じる</button></div>
+  <div class="d-b">
+    <p class="hint">Excel で DMS の表を選んでコピーし、下の枠に貼り付けてください。見出し行があってもなくても読み込めます。DMSの入庫一覧（顧客・登録・WIP番号・入庫日…）と、作業予定リスト（WIP番号・Owner・スキル・顧客名・登録番号・開始・完了予定）のどちらでも、顧客名・登録番号・WIP番号を自動で読み取ります。作業予定リストの「開始」は入庫日時、「完了予定」は出庫日時として取り込みます。</p>
+    <textarea id="pasteBox" placeholder="ここに貼り付け（Ctrl+V）"></textarea>
+    <div id="pastePreview"></div>
+  </div>
+  <div class="d-f"><span class="hint" id="pasteNote"></span><span class="sp"></span><button class="btn" type="button" data-close>キャンセル</button><button class="btn primary" type="button" id="btnCreate" disabled>カードを作成</button></div>
+</dialog>
+
+<dialog id="dlgCar">
+  <div class="d-h"><h3 id="carTitle">車両</h3><span class="hint" id="carMeta"></span><span class="d-act"><span class="note-err" id="carNote" role="alert"></span><button class="btn primary" type="button" id="btnSave">保存</button><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="d-b">
+    <div class="fld"><label>状態</label><div class="seg" id="f_state"></div></div>
+    <div class="grid">
+      <div class="fld"><label for="f_kubun">区分</label><select id="f_kubun"></select></div>
+      <div class="fld"><label for="f_vtype">車型</label><select id="f_vtype"></select></div>
+      <div class="fld"><label for="f_extraH" id="extraLbl">追加工数（h）</label><input id="f_extraH" type="number" min="0" step="0.1" placeholder="0"></div>
+      <div class="fld full hbox" id="hInfo"></div>
+      <div class="fld full" id="segBlock"><label>作業の分割</label><div id="segRows" class="segrows"></div>
+        <div class="seg-act"><button class="btn" type="button" id="btnSegAdd">作業を分ける</button><span class="hint">分けた作業は個人画面で別々に並べられます（例：作業1を9時〜12時、別の車両の後に作業2）</span></div></div>
+      <div class="fld"><label for="f_tech">担当</label><select id="f_tech"></select></div>
+      <div class="fld"><label for="f_plate">登録番号</label><input id="f_plate"></div>
+      <div class="fld"><label for="f_customer">顧客</label><input id="f_customer"></div>
+      <div class="fld"><label for="f_wip">WIP番号</label><input id="f_wip"></div>
+      <div class="fld"><label for="f_contact">顧客担当者・電話</label><input id="f_contact"></div>
+      <div class="fld"><label for="f_inDate">入庫日</label><input id="f_inDate" type="date"></div>
+      <div class="fld"><label for="f_inTime">入庫時間</label><input id="f_inTime" placeholder="9:00"></div>
+      <div class="fld"><label for="f_outDate">出庫日</label><input id="f_outDate" type="date"></div>
+      <div class="fld"><label for="f_outTime">出庫時間</label><input id="f_outTime" placeholder="18:00"></div>
+      <div class="fld"><label for="f_partsDate">部品入荷予定日</label><input id="f_partsDate" type="date"></div>
+      <div class="fld"><label>代車</label><label class="check"><input type="checkbox" id="f_loaner"> 代車あり</label></div>
+      <div class="fld full" id="loanerCarFld" hidden><label for="f_loanerCar">代車の登録番号と貸出期間</label>
+        <div class="loan-row"><select id="f_loanerCar"></select><input type="date" id="f_loanFrom" aria-label="貸出日"><span>〜</span><input type="date" id="f_loanTo" aria-label="返却日"></div>
+        <div class="hint" id="loanInfo"></div></div>
+      <div class="fld full"><label for="f_request">用命事項</label><textarea id="f_request" rows="3" placeholder="1.&#10;2."></textarea></div>
+    </div>
+    <div class="fld" id="histBlock" hidden></div>
+    <div class="fld" id="logBlock"><label>連絡記録</label>
+      <div class="log" id="logList"></div>
+      <div class="log-add"><input id="f_log" placeholder="例：見積提出、14時に折り返し"><button class="btn" type="button" id="btnLog">記録を追加</button></div>
+    </div>
+  </div>
+  <div class="d-f" id="carFoot">
+    <button class="btn danger" type="button" id="btnDel">削除</button>
+    <button class="btn" type="button" id="btnShip">出庫済にする</button>
+  </div>
+</dialog>
+<dialog id="dlgInv">
+  <div class="d-h"><h3>請求書を取り込む</h3><span class="d-act"><span class="note-err" id="invNote" role="alert"></span><button class="btn primary" type="button" id="btnInvSave" disabled>保存</button><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="d-b">
+    <p class="hint">スキャンした納品請求書のPDF（複数ページ・複数ファイル可）か画像を選ぶと、Claudeが読み取って一覧にします。内容を確認し、必要なら直してから保存してください。読み取りには、操作した人のClaudeの利用枠を使います。</p>
+    <input type="file" id="invFile" accept="application/pdf,image/jpeg,image/png,image/webp" multiple>
+    <p class="hint" id="invProg" aria-live="polite"></p>
+    <div id="invPrev"></div>
+  </div>
+</dialog>
+<dialog id="dlgInvView">
+  <div class="d-h"><h3 id="invTitle">請求書</h3><span class="d-act"><button class="btn" type="button" id="btnInvVeh">この車両の履歴</button><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="d-b" id="invBody"></div>
+  <div class="d-f"><button class="btn danger" type="button" id="btnInvDel">削除</button></div>
+</dialog>
+<dialog id="dlgLoan">
+  <div class="d-h"><h3 id="loanTitle">代車予定</h3><span class="d-act"><span class="note-err" id="loanNote" role="alert"></span><button class="btn primary" type="button" id="btnLoanSave">保存</button><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="d-b">
+    <div class="grid">
+      <div class="fld"><label for="l_car">代車</label><select id="l_car"></select></div>
+      <div class="fld"><label for="l_from">開始日</label><input type="date" id="l_from"></div>
+      <div class="fld"><label for="l_to">終了日</label><input type="date" id="l_to"></div>
+      <div class="fld full"><label for="l_note">内容</label><input id="l_note" placeholder="例：代車の車検、営業で使用、レンタカー手配（○○運送）"></div>
+    </div>
+    <p class="hint" id="loanDlgInfo"></p>
+  </div>
+  <div class="d-f" id="loanFoot"><button class="btn danger" type="button" id="btnLoanDel">削除</button></div>
+</dialog>
+<dialog id="dlgSet">
+  <div class="d-h"><h3>キャパ設定</h3><span class="d-act"><span class="note-err" id="setNote" role="alert"></span><button class="btn primary" type="button" id="btnSetSave">保存</button><button class="btn" type="button" data-close>閉じる</button></span></div>
+  <div class="d-b">
+    <div class="grid">
+      <div class="fld"><label for="s_limit">予約上限（%）</label><input id="s_limit" type="number" min="10" max="100" step="5"></div>
+      <div class="fld"><label for="s_start">始業時刻</label><input id="s_start" type="time" step="900"></div>
+      <div class="fld"><label for="s_l0">昼休み開始</label><input id="s_l0" type="time" step="900"></div>
+      <div class="fld"><label for="s_l1">昼休み終了</label><input id="s_l1" type="time" step="900"></div>
+    </div>
+    <div class="fld"><label>テクニシャン（担当のプルダウンにも使います）</label>
+      <div class="staff-head"><span>名前</span><span>1日の時間</span><span>勤務開始日</span></div>
+      <div id="staffRows" class="staff"></div>
+      <div><button class="btn" type="button" id="btnStaffAdd">テクニシャンを追加</button></div>
+    </div>
+    <p class="hint">勤務開始日が空欄の人は、以前から勤務している扱いです。増員する人は開始日を入れてください。1日のキャパ＝その日に出勤する人の時間の合計（半休は半分）。土日と休業日は0です。</p>
+    <section class="att">
+      <div class="att-h"><h3>勤務表</h3><button class="btn" type="button" id="attPrev" aria-label="前の月">‹</button><b id="attTitle"></b><button class="btn" type="button" id="attNext" aria-label="次の月">›</button>
+        <span class="hint">マスを押すと「出勤 → 休み → 研修 → 半休」の順に切り替わり、すぐに保存されます。下の段がその日のキャパです。</span></div>
+      <div class="att-wrap" id="att"></div>
+    </section>
+    <section class="att" id="bkSec">
+      <div class="att-h"><h3>データのバックアップ・復元</h3><span class="hint" id="lastBk"></span></div>
+      <p class="hint">バックアップには、カード・連絡記録・代車予定・請求書・キャパ設定・勤務表がすべて入ります。週に1回など決まった日に保存し、社内の共有フォルダに置いてください。</p>
+      <div class="seg-act"><button class="btn primary" type="button" id="btnBackup">バックアップを保存</button>
+        <label class="btn" for="restoreFile">バックアップから復元…</label><input type="file" id="restoreFile" accept=".json,application/json" hidden>
+        <span class="note-err" id="bkNote" role="alert"></span></div>
+      <div id="bkFallback" hidden><textarea id="bkText" rows="4" readonly></textarea><button class="btn" type="button" id="btnBkCopy">コピー</button></div>
+      <div id="restorePrev" class="rsbox" hidden>
+        <p id="rsInfo"></p>
+        <label class="check"><input type="checkbox" id="rsSet" checked> キャパ設定・勤務表も復元する</label>
+        <label class="check"><input type="checkbox" id="rsWipe"> バックアップにないデータは削除する（バックアップの時点に完全に戻す）</label>
+        <p class="hint" id="rsAdmin" hidden>復元できるのは、このボードの編集者（Editor）以上の人だけです。</p>
+        <div><button class="btn danger" type="button" id="btnRestore">復元を実行</button></div>
+      </div>
+    </section>
+  </div>
+</dialog>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const STATES=[["入庫待ち","--s0"],["入庫済み","--s1"],["作業待ち","--s2"],["作業中","--s3"],["合意待ち","--s4"],["部品待ち","--s5"],["完成","--s6"]];
+const KUBUN=["3か月点検","3か月点検＋Sメンテ","3か月点検＋Mメンテ","3か月点検＋Lメンテ","車検","車検＋Sメンテ","車検＋Mメンテ","車検＋Lメンテ","Sメンテ","Mメンテ","Lメンテ","一般","新車","板金"];
+const TECHS=["栢原","木村","浅井","佐藤","北畠","上田","林","ドック","スプリヤント","カリム","ケサブ"];
+const LOANERS=["7187","2088","3986","レンタカー"];
+/* 標準工数（h）：2026スカニアM含む(AL基準)・法令点検。並びは VTYPES の順 */
+const VTYPES=["トラクタ4×2","トラクタ6×4","トラック6×2","トラック6×4"];
+const STD={"3か月点検":[1.8,1.9,1.9,1.9],"3か月点検＋Sメンテ":[3.6,4.5,3.7,3.9],"3か月点検＋Mメンテ":[5.4,6.1,5.5,5.7],"3か月点検＋Lメンテ":[8.5,9.9,8.5,9.0],
+  "車検":[7.6,8.1,8.1,8.1],"車検＋Sメンテ":[8.9,10.2,9.4,9.6],"車検＋Mメンテ":[10.5,11.6,11.0,11.2],"車検＋Lメンテ":[13.5,15.3,13.9,14.4],
+  "Sメンテ":[2.5,3.3,2.5,2.7],"Mメンテ":[4.4,5.0,4.4,4.6],"Lメンテ":[7.8,9.1,7.7,8.2]};
+const stdH=c=>{const r=STD[c.kubun];if(!r)return 0;return r[Math.max(0,VTYPES.indexOf(c.vtype))]};
+const totalH=c=>stdH(c)+(+c.extraH||0);
+const fmt=n=>String(Math.round((+n||0)*10)/10);
+const inLabel=c=>c.inDate?`入庫 ${md(c.inDate)}${c.inTime?" "+c.inTime:""}`:"入庫 未定";
+const DEFSET={limit:60,dayStart:"9:00",lunchFrom:"12:00",lunchTo:"13:00",techs:TECHS.map(n=>({name:n,hours:8,from:""})),absence:{},holidays:[]};
+let settings={...DEFSET};
+const techNames=()=>(settings.techs&&settings.techs.length?settings.techs.map(t=>t.name):TECHS);
+const isHoliday=iso=>{const hm=settings.holidayMap||{};if(iso in hm)return !!hm[iso];return (settings.holidays||[]).includes(iso)};
+const isWeekend=iso=>[0,6].includes(new Date(iso+"T00:00").getDay());
+const ATT={"":"出勤",V:"休み",T:"研修",H:"半休"};
+const attOf=(iso,name)=>((settings.absence||{})[iso]||{})[name]||"";
+const working=(t,iso)=>!t.from||t.from<=iso;
+function techHours(t,iso){if(!working(t,iso))return 0;const s=attOf(iso,t.name);return s==="V"||s==="T"?0:s==="H"?(+t.hours||0)/2:(+t.hours||0)}
+function capOn(iso){if(isWeekend(iso)||isHoliday(iso))return 0;return (settings.techs||[]).reduce((a,t)=>a+techHours(t,iso),0)}
+function dayLoad(iso,except){const cs=[...cars.values()].filter(c=>c.inDate===iso&&c.id!==except);return{cars:cs,n:cs.length,h:cs.reduce((a,c)=>a+totalH(c),0)}}
+const lvl=r=>r<=settings.limit?"ok":r<=100?"warn":"over";
+/* ---------- 代車予定 ---------- */
+let loans=new Map();
+const RENT="レンタカー";
+function carPeriod(c){const from=c.loanFrom||c.inDate;if(!from)return null;let to=c.loanTo||c.outDate||from;if(to<from)to=from;return{from,to}}
+function bookings(){const out=[];
+  for(const c of cars.values()){if(!c.loaner||!c.loanerCar)continue;const p=carPeriod(c);if(!p)continue;
+    out.push({kind:"car",id:c.id,car:c.loanerCar,...p,label:c.customer||c.plate||"（顧客名なし）",done:!!c.shipped})}
+  for(const l of loans.values())if(l.car&&l.from)out.push({kind:"loan",id:l.id,car:l.car,from:l.from,to:l.to&&l.to>=l.from?l.to:l.from,label:l.note||"代車予定",done:false});
+  return out}
+const overlap=(a,b)=>a.from<=b.to&&b.from<=a.to;
+function clashesFor(car,p,except){if(car===RENT)return[];return bookings().filter(b=>b.car===car&&!(b.kind===except.kind&&b.id===except.id)&&overlap(b,p))}
+function loanStatusToday(){const t=todayISO(),cs=LOANERS.filter(x=>x!==RENT);
+  const busy=cs.filter(x=>bookings().some(b=>b.car===x&&!b.done&&b.from<=t&&t<=b.to));return{free:cs.length-busy.length,busy:busy.length}}
+const famOf=k=>!k?"":/^[3３]か月点検/.test(k)?"k-ten":/^車検/.test(k)?"k-sha":k==="新車"?"k-new":k==="板金"?"k-ban":/メンテ/.test(k)?"k-mnt":"";
+function fillSel(el,list,val,blank){const opts=[...list];if(val&&!opts.includes(val))opts.push(val);el.innerHTML=`<option value="">${blank}</option>`+opts.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("");el.value=val||""}
+let cars=new Map(), db=null, userCap=null, myId=null, canWrite=true, local=true;
+let editing=null, editState=null, delArmed=false, parsed=[];
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const md=iso=>{if(!iso)return"";const[y,m,d]=iso.split("-");return(+m)+"/"+(+d)};
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2600)}
+function setBanner(kind){const b=$("banner");const m={local:"プレビュー表示中です。この画面での変更は保存されません。",ro:"閲覧のみの権限です。カードの作成・変更はできません。",err:"保存先との接続が切れました。ページを開き直してください。"};b.textContent=m[kind]||"";b.hidden=!m[kind]}
+
+/* ---------- parsing DMS paste ---------- */
+function toISO(s){s=String(s||"").trim();if(!s)return"";
+  let m=s.match(/(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);if(m)return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);
+  if(/^\d{5}(\.\d+)?$/.test(s)){const d=new Date(Date.UTC(1899,11,30)+Math.floor(+s)*864e5);return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())}
+  return""}
+function toTime(s){s=String(s||"").trim();if(!s)return"";
+  let m=s.match(/^(\d{1,2})[:：時](\d{2})?/);if(m&&s.length<=6&&/[:：時]/.test(s))return(+m[1])+":"+(m[2]||"00");
+  if(/^\d{1,2}$/.test(s))return(+s)+":00";
+  if(/^0?\.\d+$/.test(s)){const mins=Math.round(+s*1440);return Math.floor(mins/60)+":"+pad(mins%60)}
+  return s}
+const cleanCust=s=>String(s||"").replace(/\s*御中\s*$/,"").trim();
+function parseRows(text){
+  let rows=text.replace(/\r/g,"").split("\n").filter(l=>l.trim()).map(l=>l.split("\t").map(c=>c.trim()));
+  while(rows.length&&rows.every(r=>r.length>1&&(r[0]===""||r[0]==="+")))rows=rows.map(r=>r.slice(1));
+  if(!rows.length)return[];
+  const H={wip:/WIP|^WO/i,customer:/顧客/,plate:/登録/,inDate:/入庫日|開始/,inTime:/入庫時/,outDate:/出庫日|完了/,outTime:/出庫時/};
+  let map=null;
+  if(rows[0].some(c=>/顧客|登録|WIP/i.test(c))){const h=rows.shift();map={};for(const k in H){const i=h.findIndex(c=>H[k].test(c));if(i>=0)map[k]=i}}
+  if(!map){for(const r of rows.slice(0,8)){const g=guessMap(r);if(g&&(!map||g._n>map._n))map=g}}
+  if(!map){const wipFirst=rows[0]&&/^W?\d{4,}$/i.test(rows[0][0]);
+    map=wipFirst?{wip:0,customer:1,plate:2,inDate:3,inTime:4,outDate:5,outTime:6}:{customer:0,plate:1,wip:2,inDate:3,inTime:4,outDate:5,outTime:6}}
+  const seen=new Set();
+  const sepTime=k=>map[k+"Time"]!=null&&map[k+"Time"]!==map[k+"Date"];
+  return rows.map(r=>{const g=k=>map[k]!=null?(r[map[k]]||""):"";
+    const pi=parseDT(g("inDate")),po=parseDT(g("outDate"));
+    const o={wip:g("wip").toUpperCase(),customer:cleanCust(g("customer")),plate:g("plate"),
+      inDate:pi.d,inTime:sepTime("in")?toTime(g("inTime")):pi.t,outDate:po.d,outTime:sepTime("out")?toTime(g("outTime")):po.t};
+    const id=docId(o.wip);
+    if(!o.wip||!id){
+      const pk=normPlate(o.plate)+"|"+o.inDate;
+      if(!o.plate&&!o.customer)o.status="bad";
+      else if(o.plate&&(seen.has(pk)||[...cars.values()].some(c=>normPlate(c.plate)===normPlate(o.plate)&&(c.inDate||"")===o.inDate&&!c.shipped)))o.status="dup";
+      else o.status="nowip";
+      if(o.plate)seen.add(pk);return o}
+    if(cars.has(id)||seen.has(id)||hasWip(o.wip))o.status="dup";else o.status="ok";
+    seen.add(id);return o})}
+const normPlate=s=>String(s||"").replace(/\s+/g,"");
+/* 日付と時刻が1つのセルに入っている形式（例：9.00am 火・13/10/2026）にも対応。dd/mm/yyyy は日/月/年として読む */
+function parseDT(s){s=String(s||"").trim();if(!s||/not\s*booked/i.test(s))return{d:"",t:""};
+  let t="";const m=s.match(/(\d{1,2})[.:](\d{2})\s*(am|pm)/i);
+  if(m){let h=(+m[1])%12;if(/pm/i.test(m[3]))h+=12;t=h+":"+m[2]}else{const m2=s.match(/(\d{1,2}):(\d{2})/);if(m2)t=(+m2[1])+":"+m2[2]}
+  let d=toISO(s);
+  if(!d){const a=s.match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/);if(a)d=a[3]+"-"+pad(a[2])+"-"+pad(a[1])}
+  if(!d){const b=s.match(/(\d{1,2})月\s*(\d{1,2})日/);if(b)d=new Date().getFullYear()+"-"+pad(b[1])+"-"+pad(b[2])}
+  return{d,t}}
+/* 見出し行がない時、中身から列を推定する */
+function guessMap(r){const wip=r.findIndex(c=>/^W\d{4,}$/i.test(c));if(wip<0)return null;
+  const plate=r.findIndex((c,i)=>i!==wip&&(/^[^\s\d]{1,5}\s*\d{2,4}\s*[ぁ-ん]?\s*\d{0,4}$/.test(c)||/^\d{2}\/N?\d+$/i.test(c)));if(plate<0)return null;
+  let cust=r.findIndex((c,i)=>i!==wip&&i!==plate&&/株式会社|有限会社|合同会社|御中|運送|運輸|商店|商会|物流|Vehicle/i.test(c));
+  if(cust<0)cust=plate-1!==wip&&plate>0?plate-1:plate+1;
+  const m={wip,plate,customer:cust};
+  const dts=r.map((c,i)=>i).filter(i=>i!==wip&&i!==plate&&/\d{1,2}[.:]\d{2}\s*(am|pm)|\d{4}[\/\-.年]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4}|^\d{5}$/i.test(r[i]));
+  m._n=dts.length;
+  if(dts[0]!=null){m.inDate=dts[0];if(/^\d{1,2}(:\d{2})?$/.test(r[dts[0]+1]||""))m.inTime=dts[0]+1}
+  if(dts[1]!=null){m.outDate=dts[1];if(/^\d{1,2}(:\d{2})?$/.test(r[dts[1]+1]||""))m.outTime=dts[1]+1}
+  return m}
+const docId=w=>String(w||"").replace(/[^A-Za-z0-9_\-.~:@+]/g,"");
+const hasWip=(w,except)=>{w=String(w||"").toUpperCase();if(!w)return false;for(const c of cars.values())if(c.id!==except&&String(c.wip||"").toUpperCase()===w)return true;return false};
+
+function renderPreview(){
+  parsed=parseRows($("pasteBox").value);
+  const ok=parsed.filter(r=>r.status==="ok"||r.status==="nowip").length,dup=parsed.filter(r=>r.status==="dup").length,bad=parsed.filter(r=>r.status==="bad").length;
+  if(!parsed.length){$("pastePreview").innerHTML="";$("pasteNote").textContent="";$("btnCreate").disabled=true;return}
+  const lab={ok:["作成","ok"],nowip:["作成（WIPなし）","ok"],dup:["登録済み","dup"],bad:["読めない行","bad"]};
+  $("pastePreview").innerHTML='<div class="tbl-wrap"><table><thead><tr><th></th><th>顧客</th><th>登録番号</th><th>WIP番号</th><th>入庫</th><th>出庫</th></tr></thead><tbody>'+
+    parsed.map(r=>`<tr><td><span class="st ${lab[r.status][1]}">${lab[r.status][0]}</span></td><td>${esc(r.customer)}</td><td>${esc(r.plate)}</td><td class="mono">${esc(r.wip)}</td><td class="mono">${esc(md(r.inDate))} ${esc(r.inTime)}</td><td class="mono">${esc(md(r.outDate))} ${esc(r.outTime)}</td></tr>`).join("")+"</tbody></table></div>";
+  $("pasteNote").textContent=`作成 ${ok}台`+(dup?`・登録済み ${dup}台（作成しません）`:"")+(bad?`・読めない行 ${bad}`:"");
+  $("btnCreate").disabled=!ok||!canWrite;$("btnCreate").textContent=ok?`${ok}台のカードを作成`:"カードを作成"}
+
+async function createFromPaste(){
+  const rows=parsed.filter(r=>r.status==="ok"||r.status==="nowip");if(!rows.length)return;
+  $("btnCreate").disabled=true;let n=0;
+  for(const [i,r] of rows.entries()){const {status,...data}=r;
+    try{await writeCar(docId(r.wip)||("M"+Date.now().toString(36)+i),{...data,state:"入庫待ち",vtype:"",extraH:0,kubun:"",tech:"",request:"",contact:"",partsDate:"",loaner:false,shipped:false,log:[],created:new Date().toISOString()},true);n++}
+    catch(e){toast(errText(e));break}}
+  $("dlgPaste").close();$("pasteBox").value="";renderPreview();toast(`${n}台のカードを作成しました`)}
+
+/* ---------- storage ---------- */
+function errText(e){const c=e&&e.code;return c==="quota_exceeded"?"保存できる件数の上限です。出庫済のカードを削除してください。":c==="invalid_argument"?"変更する権限がありません。":"保存できませんでした。もう一度お試しください。"}
+async function writeCar(id,data,create){
+  data={...data,updated:data.updated||new Date().toISOString(),updatedBy:myId||""};
+  if(local||!db){const cur=cars.get(id)||{},nd={...cur,...data,id};if(data.logs)nd.logs={...(cur.logs||{}),...data.logs};cars.set(id,nd);render();return}
+  const ref=db.collection("cars").doc(id);
+  try{create?await ref.set(data):await ref.update(data)}
+  catch(e){if(e&&e.code==="unavailable"){await new Promise(r=>setTimeout(r,400+Math.random()*600));create?await ref.set(data):await ref.update(data)}else throw e}}
+async function removeCar(id){if(local||!db){cars.delete(id);render();return}await db.collection("cars").doc(id).delete()}
+
+/* ---------- board ---------- */
+function render(){
+  const t=todayISO(),q=$("q").value.trim().toLowerCase(),showS=$("showShipped").checked;
+  $("today").textContent=t.replace(/-/g,"/");
+  const all=[...cars.values()];
+  const active=all.filter(c=>!c.shipped);
+  const dueToday=active.filter(c=>c.outDate===t&&c.state!=="完成").length;
+  const late=active.filter(c=>c.outDate&&c.outDate<t&&c.state!=="完成").length;
+  $("summary").innerHTML=`<span class="chip">入庫待ち <b>${active.filter(c=>c.state==="入庫待ち").length}</b>台</span><span class="chip">入庫 <b>${active.filter(c=>c.state!=="入庫待ち").length}</b>台</span>`+
+    (dueToday?`<span class="chip warn">本日出庫予定 <b>${dueToday}</b>台</span>`:"")+
+    (late?`<span class="chip bad">出庫日超過 <b>${late}</b>台</span>`:"")+
+    `<span class="chip">完成 <b>${active.filter(c=>c.state==="完成").length}</b>台</span>`+
+    (()=>{const s=loanStatusToday();return `<span class="chip${s.free?"":" warn"}">代車 空き <b>${s.free}</b>台／貸出中 <b>${s.busy}</b>台</span>`})();
+  const list=all.filter(c=>(showS||!c.shipped)&&(!q||[c.plate,c.customer,c.wip,c.tech].join(" ").toLowerCase().includes(q)));
+  const key=c=>(c.inDate||"9999")+" "+String(c.inTime||"").padStart(5,"0")+" "+(c.customer||"");
+  $("board").innerHTML=STATES.map(([s,v])=>{
+    const cs=list.filter(c=>(c.state||"入庫済み")===s).sort((a,b)=>key(a)<key(b)?-1:1);
+    return `<section class="col" data-state="${s}" style="--sc:var(${v})"><div class="col-h"><span class="dot"></span><h2>${s}</h2><span class="n">${cs.length}</span></div><div class="cards">${cs.length?cs.map(c=>cardHTML(c,t)).join(""):`<div class="empty">${s==="入庫待ち"&&!all.length?"「DMSから貼り付け」で入庫車両を取り込むと、ここにカードが並びます":"カードをここへドラッグ"}</div>`}</div></section>`}).join("");
+  if(!$("monthView").hidden)renderMonth();if(!$("personView").hidden)renderPerson();if(!$("histView").hidden)renderHist()}
+function cardHTML(c,t){
+  const done=c.state==="完成";
+  const waiting=(c.state||"入庫済み")==="入庫待ち";
+  const inCls=!waiting||!c.inDate||c.shipped?"":c.inDate<t?"late":c.inDate===t?"today":"";
+  const k=c.kubun?`<span class="kubun">${esc(c.kubun)}</span>`:"";
+  const l2=`<div class="req"><span class="lbl">用命</span>${c.request?esc(c.request):'<span class="none">未入力</span>'}</div>`+
+    `<div class="c-foot"><span class="due ${inCls}">${esc(inLabel(c))}</span>`+
+    `<span class="tag loan${c.loaner?" on":""}">代車 ${c.loaner?esc(c.loanerCar||"あり"):"無し"}</span></div>`;
+  const foot=[totalH(c)?`<span class="tag">工数 ${fmt(totalH(c))}h</span>`:"",c.tech?`<span class="tag">担当 ${esc(c.tech)}</span>`:"",
+    c.state==="部品待ち"&&c.partsDate?`<span class="tag parts">部品 ${esc(md(c.partsDate))}入荷</span>`:"",
+    c.shipped?`<span class="tag">出庫済</span>`:""].join("");
+  const fam=famOf(c.kubun);
+  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
+
+const board=$("board");
+board.addEventListener("click",e=>{const c=e.target.closest(".card");if(c)openCar(c.dataset.id)});
+board.addEventListener("keydown",e=>{const c=e.target.closest(".card");if(c&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openCar(c.dataset.id)}});
+board.addEventListener("dragstart",e=>{const c=e.target.closest(".card");if(!c)return;e.dataTransfer.setData("text/plain",c.dataset.id);e.dataTransfer.effectAllowed="move";c.classList.add("dragging")});
+board.addEventListener("dragend",e=>{e.target.closest?.(".card")?.classList.remove("dragging");document.querySelectorAll(".col.over").forEach(x=>x.classList.remove("over"))});
+board.addEventListener("dragover",e=>{const col=e.target.closest(".col");if(!col||!canWrite)return;e.preventDefault();document.querySelectorAll(".col.over").forEach(x=>x!==col&&x.classList.remove("over"));col.classList.add("over")});
+board.addEventListener("drop",async e=>{const col=e.target.closest(".col");if(!col)return;e.preventDefault();col.classList.remove("over");
+  const id=e.dataTransfer.getData("text/plain"),c=cars.get(id);if(!c||c.state===col.dataset.state)return;
+  try{await writeCar(id,{state:col.dataset.state,updated:new Date().toISOString()})}catch(err){toast(errText(err))}});
+
+/* ---------- car dialog ---------- */
+const F=["kubun","tech","plate","customer","wip","contact","inDate","inTime","outDate","outTime","partsDate","request"];
+function openCar(id,preset){
+  const c=id?cars.get(id):null;if(id&&!c)return;editing=id||null;delArmed=false;openSnap=c?JSON.parse(JSON.stringify(c)):null;
+  $("carTitle").textContent=c?([c.customer,c.plate].filter(Boolean).join("｜")||c.wip||"車両"):"1台追加";
+  F.forEach(k=>{if(k!=="kubun"&&k!=="tech")$("f_"+k).value=c?(c[k]||""):""});
+  fillSel($("f_kubun"),KUBUN,c&&c.kubun,"選択してください");fillSel($("f_tech"),techNames(),c&&c.tech,"未定");$("f_loanFrom").value=c&&c.loanFrom||"";$("f_loanTo").value=c&&c.loanTo||"";
+  fillSel($("f_vtype"),VTYPES,c&&c.vtype,"未選択");$("f_extraH").value=c&&+c.extraH?c.extraH:"";
+  if(!c&&preset)Object.entries(preset).forEach(([k,v])=>{$("f_"+k).value=v});
+  $("f_loaner").checked=!!(c&&c.loaner);$("loanerCarFld").hidden=!$("f_loaner").checked;
+  $("f_wip").readOnly=!!(c&&c.wip);$("carNote").textContent="";editState=c?(c.state||"入庫済み"):"入庫待ち";paintState();
+  $("logBlock").hidden=!c;renderLog(c);
+  $("btnDel").hidden=!c;$("carFoot").hidden=!c;$("btnDel").textContent="削除";$("btnShip").hidden=!c;$("btnShip").textContent=c&&c.shipped?"出庫済を取り消す":"出庫済にする";
+  [$("btnSave"),$("btnDel"),$("btnShip"),$("btnLog")].forEach(b=>b.disabled=!canWrite);
+  segEdit=c?segsOf(c).map((s,i)=>({id:s.sid,h:s.h,tech:s.tech,seq:s.seq,from:s.from,at:s.at,fix:s.fix,fixed:typeof c.seq==="number"||!!(Array.isArray(c.segs)&&c.segs[i]&&typeof c.segs[i].seq==="number")})):[{id:"main",tech:""}];
+  updH();updLoan(c&&c.loanerCar||"");renderCardHist(c);segsInit=JSON.stringify(segsOut($("f_tech").value));renderMeta(c);$("dlgCar").showModal()}
+/* 作業の分割 */
+let segEdit=[];
+const formTotal=()=>Math.max(0.5,stdH({kubun:$("f_kubun").value,vtype:$("f_vtype").value})+(Math.max(0,parseFloat($("f_extraH").value)||0)));
+function renderSegs(){const T=formTotal(),n=segEdit.length;
+  const fixRow=s=>`<div class="segrow" data-i="${n-1}"><span class="sl">予定の長さ</span><span class="sh">${fmt(s.h)}h（時間軸で変更）</span><button class="btn" type="button" data-unfix>工数どおりに戻す</button></div>`;
+  if(n<2){$("segRows").innerHTML=segEdit[0]&&segEdit[0].fix?fixRow(segEdit[0]):"";$("btnSegAdd").textContent="作業を分ける";return}
+  const others=segEdit.slice(0,-1).reduce((a,s)=>a+(+s.h||0),0);
+  const opts=v=>`<option value="">未定</option>`+[...new Set([...techNames(),...(v?[v]:[])])].map(x=>`<option value="${esc(x)}"${x===v?" selected":""}>${esc(x)}</option>`).join("");
+  $("segRows").innerHTML=segEdit.map((s,i)=>`<div class="segrow" data-i="${i}"><span class="sl">作業${i+1}</span>`+
+    (i<n-1||s.fix?`<input type="number" min="0.25" step="0.25" value="${esc(s.h)}" data-h aria-label="作業${i+1}の時間"><span>h</span>${s.fix&&i===n-1?'<button class="btn" type="button" data-unfix>残りに戻す</button>':""}`:`<span class="sh">残り ${fmt(Math.max(0,T-others))}h</span>`)+
+    `<select data-t aria-label="作業${i+1}の担当">${opts(s.tech||"")}</select>`+(i>0?`<button class="btn" type="button" data-rm>前の作業にまとめる</button>`:"")+`</div>`).join("");
+  $("btnSegAdd").textContent="さらに分ける"}
+$("btnSegAdd").addEventListener("click",()=>{const T=formTotal(),n=segEdit.length,others=segEdit.slice(0,-1).reduce((a,s)=>a+(+s.h||0),0);
+  const last=segEdit[n-1],rest=Math.max(1,T-others),half=Math.max(0.5,Math.round(rest/2*2)/2);
+  delete last.fix;last.h=half;const ns={id:"s"+Date.now().toString(36),tech:last.tech||$("f_tech").value,fixed:true};
+  if(typeof last.seq==="number"){ns.seq=last.seq+0.5;last.fixed=true}segEdit.push(ns);renderSegs()});
+$("segRows").addEventListener("change",e=>{const row=e.target.closest(".segrow");if(!row)return;const i=+row.dataset.i;
+  if(e.target.matches("[data-h]"))segEdit[i].h=Math.max(0.25,parseFloat(e.target.value)||0.5);
+  if(e.target.matches("[data-t]")){segEdit[i].tech=e.target.value;if(i===0)$("f_tech").value=e.target.value}
+  renderSegs()});
+$("segRows").addEventListener("click",e=>{if(e.target.matches("[data-unfix]")){const s=segEdit[segEdit.length-1];delete s.fix;delete s.h;renderSegs();return}if(!e.target.matches("[data-rm]"))return;const i=+e.target.closest(".segrow").dataset.i;
+  const prev=segEdit[i-1];if(i===segEdit.length-1)delete prev.h;else prev.h=(+prev.h||0)+(+segEdit[i].h||0);segEdit.splice(i,1);renderSegs()});
+$("f_tech").addEventListener("change",()=>{if(segEdit[0])segEdit[0].tech=$("f_tech").value;renderSegs()});
+function updLoan(keep){const sel=$("f_loanerCar"),val=keep!=null?keep:sel.value;
+  const from=$("f_loanFrom").value||$("f_inDate").value,to0=$("f_loanTo").value||$("f_outDate").value||from,p=from?{from,to:to0<from?from:to0}:null;
+  const ex={kind:"car",id:editing};
+  sel.innerHTML=`<option value="">選択してください</option>`+LOANERS.map(x=>{const cl=p?clashesFor(x,p,ex):[];
+    return `<option value="${esc(x)}">${esc(x)}${cl.length?`（${cl.map(b=>`${md(b.from)}〜${md(b.to)} ${b.label}`).join("、")}で使用中）`:p&&x!==RENT?"（空き）":""}</option>`}).join("");
+  sel.value=val;
+  const info=$("loanInfo");if(!p){info.textContent="入庫日を入れると貸出期間が決まります（貸出日・返却日が空欄の時は入庫日〜出庫日）";return}
+  const cl=val?clashesFor(val,p,ex):[];
+  info.innerHTML=`貸出期間 ${md(p.from)}〜${md(p.to)}${$("f_loanFrom").value||$("f_loanTo").value?"":"（入庫日〜出庫日）"}`+(cl.length?`　<span class="over">${esc(val)}はこの期間に予定があります</span>`:"")}
+["f_loanerCar","f_loanFrom","f_loanTo","f_inDate","f_outDate"].forEach(k=>$(k).addEventListener("change",()=>{if(!$("loanerCarFld").hidden)updLoan()}));
+function updH(){const o={kubun:$("f_kubun").value,vtype:$("f_vtype").value,extraH:Math.max(0,parseFloat($("f_extraH").value)||0)};
+  const s=stdH(o),has=!!STD[o.kubun];$("extraLbl").textContent=has?"追加工数（h）":"工数（h）";
+  let h=has?`標準 <b>${fmt(s)}</b>h${o.vtype?"":"（車型未選択のためトラクタ4×2で計算）"} ＋ 追加 <b>${fmt(o.extraH)}</b>h ＝ 合計 <b>${fmt(s+o.extraH)}</b>h`
+    :o.kubun?`${esc(o.kubun)}は標準工数がありません。工数を入力してください。合計 <b>${fmt(o.extraH)}</b>h`:"区分を選ぶと標準工数が入ります";
+  const d=$("f_inDate").value;
+  if(d){const cap=capOn(d),L=dayLoad(d,editing),after=L.h+s+o.extraH;
+    if(!cap)h+=`<br><span class="over">${md(d)}はキャパ0hの日です（休み）</span>`;
+    else{const r=after/cap*100,lv=lvl(r);h+=`<br>${md(d)}の予約 <b>${fmt(L.h)}</b>h → 保存後 <b>${fmt(after)}</b>h／キャパ ${fmt(cap)}h（<span class="${lv}">${Math.round(r)}%</span>）${lv!=="ok"?`　<span class="${lv}">予約上限 ${settings.limit}% を超えます</span>`:""}`}}
+  $("hInfo").innerHTML=h;if(segEdit.length)renderSegs()}
+["f_kubun","f_vtype","f_extraH","f_inDate"].forEach(k=>{$(k).addEventListener("input",updH);$(k).addEventListener("change",updH)});
+function paintState(){$("f_state").innerHTML=STATES.map(([s,v])=>`<button type="button" style="--sc:var(${v})" aria-pressed="${s===editState}" data-s="${s}">${s}</button>`).join("")}
+$("f_state").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;editState=b.dataset.s;paintState()});
+function logsOf(c){return [...((c&&c.log)||[]),...Object.values((c&&c.logs)||{})].filter(x=>x&&x.text).sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
+function renderLog(c){const l=logsOf(c);
+  $("logList").innerHTML=l.length?l.map(x=>{const d=new Date(x.at);return `<div class="log-i"><span class="when">${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</span><span class="who" data-uid="${esc(x.by||"")}"></span>${esc(x.text)}</div>`}).join(""):`<p class="hint">まだ記録はありません</p>`;
+  fillNames($("logList"))}
+/* 利用者の名前（保存するのはIDだけ。表示のたびに名前を引く） */
+async function fillNames(root){const els=[...root.querySelectorAll("[data-uid]")].filter(e=>e.dataset.uid);if(!els.length||!userCap||!userCap.profiles)return;
+  try{const ps=await userCap.profiles([...new Set(els.map(e=>e.dataset.uid))]);els.forEach(e=>{const n=(ps[e.dataset.uid]&&ps[e.dataset.uid].name)||"";if(n)e.textContent=n+"　"})}catch(e){}}
+function renderMeta(c){const m=$("carMeta");if(!c||!c.updated){m.textContent="";return}const d=new Date(c.updated);
+  m.innerHTML=`最終更新 ${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} <span data-uid="${esc(c.updatedBy||"")}"></span>`;fillNames(m)}
+function formData(){const o={};F.forEach(k=>o[k]=$("f_"+k).value.trim());o.inTime=toTime(o.inTime);o.outTime=toTime(o.outTime);o.wip=o.wip.toUpperCase();o.loaner=$("f_loaner").checked;o.loanerCar=o.loaner?$("f_loanerCar").value:"";o.loanFrom=o.loaner?$("f_loanFrom").value:"";o.loanTo=o.loaner?$("f_loanTo").value:"";o.vtype=$("f_vtype").value;o.extraH=Math.max(0,parseFloat($("f_extraH").value)||0);o.state=editState;
+  o.segs=segsOut(o.tech);return o}
+function segsOut(tech){const n=segEdit.length;return segEdit.map((s,i)=>({id:s.id,...(i<n-1||s.fix?{h:Math.max(0.25,+s.h||0.5)}:{}),...(s.fix&&i===n-1?{fix:true}:{}),...(s.at!=null?{at:s.at}:{}),...(s.fixed&&typeof s.seq==="number"?{seq:s.seq}:{}),...(s.from?{from:s.from}:{}),tech:i===0?tech:(s.tech||"")}))}
+let openSnap=null,segsInit="";
+/* 開いた時から変えた項目だけを保存する（同時に他の人が変えた項目を上書きしない） */
+function changedFields(o){const p={},same=(a,b)=>JSON.stringify(a??"")===JSON.stringify(b??"");
+  for(const k of Object.keys(o)){if(k==="segs")continue;if(!same(o[k],openSnap[k]))p[k]=o[k]}
+  if(JSON.stringify(o.segs)!==segsInit){p.segs=o.segs;p.tech=o.tech}return p}
+$("f_loaner").addEventListener("change",()=>{$("loanerCarFld").hidden=!$("f_loaner").checked;if($("f_loaner").checked)updLoan()});
+$("btnSave").addEventListener("click",async()=>{const o=formData(),note=$("carNote");note.textContent="";
+  if(!o.customer&&!o.plate){note.textContent="顧客名か登録番号を入力してください";return}
+  try{if(editing){const cur=cars.get(editing);const wip=cur.wip||o.wip;
+      if(!cur.wip&&wip&&hasWip(wip,editing)){note.textContent="このWIP番号のカードは既にあります";return}
+      const patch=changedFields({...o,wip});
+      if(!Object.keys(patch).length){$("dlgCar").close();toast("変更はありません");return}
+      const moved=(cur.updated||"")!==(openSnap.updated||"");
+      await writeCar(editing,patch);
+      if(moved){$("dlgCar").close();toast("ほかの人の変更はそのまま残し、あなたが変えた項目だけ保存しました");return}}
+    else{if(o.wip&&(cars.has(docId(o.wip))||hasWip(o.wip))){note.textContent="このWIP番号のカードは既にあります";return}
+      const id=docId(o.wip)||("M"+Date.now().toString(36));
+      await writeCar(id,{...o,shipped:false,log:[],created:new Date().toISOString()},true)}
+    $("dlgCar").close();toast("保存しました")}catch(e){note.textContent=errText(e)}});
+$("btnLog").addEventListener("click",async()=>{const txt=$("f_log").value.trim();if(!txt||!editing)return;const c=cars.get(editing);
+  const lid="l"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  try{await writeCar(editing,{logs:{[lid]:{at:new Date().toISOString(),text:txt,by:myId||""}}});$("f_log").value="";renderLog(cars.get(editing))}catch(e){$("carNote").textContent=errText(e)}});
+$("f_log").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();$("btnLog").click()}});
+$("btnShip").addEventListener("click",async()=>{const c=cars.get(editing);if(!c)return;
+  try{await writeCar(editing,{shipped:!c.shipped,updated:new Date().toISOString()});$("dlgCar").close();toast(c.shipped?"出庫済を取り消しました":"出庫済にしました")}catch(e){$("carNote").textContent=errText(e)}});
+$("btnDel").addEventListener("click",async()=>{if(!delArmed){delArmed=true;$("btnDel").textContent="本当に削除する";return}
+  try{await removeCar(editing);$("dlgCar").close();toast("削除しました")}catch(e){$("carNote").textContent=errText(e)}});
+
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest("dialog").close()));
+$("btnPaste").addEventListener("click",()=>{$("dlgPaste").showModal();renderPreview();$("pasteBox").focus()});
+$("btnAdd").addEventListener("click",()=>openCar(null));
+$("pasteBox").addEventListener("input",renderPreview);
+$("btnCreate").addEventListener("click",createFromPaste);
+$("q").addEventListener("input",render);
+$("showShipped").addEventListener("change",render);
+setInterval(()=>{if(!document.querySelector("dialog[open]"))render()},60000);
+
+/* ---------- month view ---------- */
+let mCur=(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}})(),selDay=null;
+const isoOf=(y,m,d)=>y+"-"+pad(m+1)+"-"+pad(d);
+function renderMonth(){
+  const{y,m}=mCur;$("mTitle").textContent=`${y}年${m+1}月`;
+  const first=new Date(y,m,1),start=new Date(y,m,1-((first.getDay()+6)%7)),t=todayISO();
+  let html=["月","火","水","木","金","土","日"].map((w,i)=>`<div class="wd${i===5?" sat":i===6?" sun":""}">${w}</div>`).join("");
+  let tH=0,tC=0,tN=0,overD=0;
+  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);if(i===35&&d.getMonth()!==m)break;
+    const iso=isoOf(d.getFullYear(),d.getMonth(),d.getDate()),inM=d.getMonth()===m;
+    const cap=capOn(iso),L=dayLoad(iso),r=cap?L.h/cap*100:0,lv=cap?(L.n?lvl(r):""):(L.h?"over":"");
+    if(inM){tH+=L.h;tC+=cap;tN+=L.n;if(cap&&r>settings.limit)overD++}
+    const wk=[0,6].includes(d.getDay());
+    html+=`<button type="button" class="day${inM?"":" out"}${cap?"":" off"}${lv?" lv-"+lv:""}${iso===t?" today":""}${iso===selDay?" sel":""}" data-d="${iso}"><span class="d-top"><span class="dn">${d.getDate()}</span><span class="cnt">${L.n?L.n+"台":""}</span></span>`+
+      (cap?`<span class="bar"><i style="width:${Math.min(100,r)}%"></i><b class="lim" style="left:${Math.min(100,settings.limit)}%"></b></span><span class="dh">${fmt(L.h)}/${fmt(cap)}h <span class="p">${Math.round(r)}%</span></span>`
+        :`<span class="offlbl">${wk?"休み":"休業日"}${L.h?` ・ ${fmt(L.h)}h`:""}</span>`)+`</button>`}
+  $("cal").innerHTML=html;
+  const ar=tC?tH/tC*100:0;
+  $("mSum").innerHTML=`<span class="chip">予約 <b>${fmt(tH)}</b>h／キャパ <b>${fmt(tC)}</b>h</span><span class="chip${ar>settings.limit?" warn":""}">月の予約率 <b>${Math.round(ar)}</b>%</span><span class="chip">入庫予定 <b>${tN}</b>台</span>${overD?`<span class="chip bad">上限超えの日 <b>${overD}</b>日</span>`:""}`;
+  renderDay();renderLoans();if($("dlgSet").open)renderAtt()}
+function renderLoans(){const{y,m}=mCur,n=new Date(y,m+1,0).getDate(),ms=isoOf(y,m,1),me=isoOf(y,m,n),t=todayISO();
+  const all=bookings(),cols=`7em repeat(${n},30px)`;
+  const dIdx=iso=>iso<ms?1:iso>me?n:+iso.slice(8);
+  let h=`<div class="ln" style="grid-template-columns:${cols}"><div class="nm"></div>`+[...Array(n)].map((_,i)=>{const d=isoOf(y,m,i+1),dt=new Date(d+"T00:00");return `<div class="dh2${isWeekend(d)||isHoliday(d)?" we":""}">${i+1}<br>${"日月火水木金土"[dt.getDay()]}</div>`}).join("")+`</div>`;
+  for(const car of LOANERS){
+    const items=all.filter(b=>b.car===car&&b.from<=me&&b.to>=ms).sort((a,b)=>a.from<b.from?-1:a.from>b.from?1:0);
+    const lanes=[];items.forEach(b=>{let i=lanes.findIndex(end=>end<b.from);if(i<0){i=lanes.length;lanes.push(b.to)}else lanes[i]=b.to;b.lane=i});
+    const L=Math.max(1,lanes.length);
+    let r=`<div class="ln" style="grid-template-columns:${cols};grid-template-rows:repeat(${L},24px)"><div class="nm" style="grid-row:1/span ${L};grid-column:1">${esc(car)}</div>`;
+    for(let i=1;i<=n;i++){const d=isoOf(y,m,i);r+=`<div class="bg${isWeekend(d)||isHoliday(d)?" we":""}${d===t?" td":""}" style="grid-row:1/span ${L};grid-column:${i+1}"></div>`}
+    items.forEach(b=>{const s=dIdx(b.from),e=dIdx(b.to),clash=car!==RENT&&items.some(o=>o!==b&&overlap(o,b));
+      const cls=clash?"clash":car===RENT?"rent":b.kind==="loan"?"man":"";
+      r+=`<button type="button" class="lb ${cls}${b.done?" done":""}" style="grid-row:${b.lane+1};grid-column:${s+1}/${e+2}" data-kind="${b.kind}" data-id="${esc(b.id)}" title="${esc(b.label)} ${md(b.from)}〜${md(b.to)}">${b.from<ms?"◀ ":""}${esc(b.label)}${b.to>me?" ▶":""}</button>`});
+    h+=r+`</div>`}
+  $("loanGrid").innerHTML=h}
+$("loanGrid").addEventListener("click",e=>{const b=e.target.closest(".lb");if(!b)return;b.dataset.kind==="car"?openCar(b.dataset.id):openLoan(b.dataset.id)});
+/* 代車だけの予定 */
+let editLoan=null,loanDelArmed=false;
+function openLoan(id,preset){const l=id?loans.get(id):null;editLoan=id||null;loanDelArmed=false;
+  $("loanTitle").textContent=l?"代車予定":"代車予定を追加";
+  $("l_car").innerHTML=LOANERS.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("l_car").value=l?l.car:LOANERS[0];$("l_from").value=l?l.from:(preset&&preset.from)||todayISO();$("l_to").value=l?(l.to||l.from):(preset&&preset.from)||todayISO();
+  $("l_note").value=l?l.note||"":"";$("loanNote").textContent="";$("loanFoot").hidden=!l;$("btnLoanDel").textContent="削除";
+  [$("btnLoanSave"),$("btnLoanDel")].forEach(b=>b.disabled=!canWrite);updLoanDlg();$("dlgLoan").showModal()}
+function updLoanDlg(){const car=$("l_car").value,from=$("l_from").value,to=$("l_to").value||from;
+  if(!from){$("loanDlgInfo").textContent="";return}
+  const cl=clashesFor(car,{from,to:to<from?from:to},{kind:"loan",id:editLoan});
+  $("loanDlgInfo").innerHTML=cl.length?`<span class="note-err">${esc(car)}はこの期間に予定があります：${cl.map(b=>`${md(b.from)}〜${md(b.to)} ${esc(b.label)}`).join("、")}</span>`:car===RENT?"":`${esc(car)}はこの期間空いています`}
+["l_car","l_from","l_to"].forEach(k=>$(k).addEventListener("change",updLoanDlg));
+async function writeLoan(id,data,create){if(local||!db){loans.set(id,{...(loans.get(id)||{}),...data,id});render();return}
+  const ref=db.collection("loans").doc(id);create?await ref.set(data):await ref.update(data)}
+async function removeLoan(id){if(local||!db){loans.delete(id);render();return}await db.collection("loans").doc(id).delete()}
+$("btnLoanAdd").addEventListener("click",()=>openLoan(null,{from:selDay||todayISO()}));
+$("btnLoanSave").addEventListener("click",async()=>{const note=$("loanNote");note.textContent="";
+  const d={car:$("l_car").value,from:$("l_from").value,to:$("l_to").value||$("l_from").value,note:$("l_note").value.trim()};
+  if(!d.from){note.textContent="開始日を入力してください";return}if(d.to<d.from){note.textContent="終了日が開始日より前です";return}
+  try{if(editLoan)await writeLoan(editLoan,d);else await writeLoan("L"+Date.now().toString(36),{...d,created:new Date().toISOString()},true);$("dlgLoan").close();toast("代車予定を保存しました")}catch(e){note.textContent=errText(e)}});
+$("btnLoanDel").addEventListener("click",async()=>{if(!loanDelArmed){loanDelArmed=true;$("btnLoanDel").textContent="本当に削除する";return}
+  try{await removeLoan(editLoan);$("dlgLoan").close();toast("削除しました")}catch(e){$("loanNote").textContent=errText(e)}});
+function renderAtt(){const{y,m}=mCur,n=new Date(y,m+1,0).getDate(),ts=settings.techs||[];$("attTitle").textContent=`${y}年${m+1}月`;
+  const days=[...Array(n)].map((_,i)=>isoOf(y,m,i+1));
+  let h=`<table><thead><tr><th class="nm">${m+1}月</th>`+days.map(d=>{const dt=new Date(d+"T00:00"),we=isWeekend(d)||isHoliday(d);return `<th class="${we?"we":""}">${dt.getDate()}<span class="w">${"日月火水木金土"[dt.getDay()]}</span></th>`}).join("")+`</tr></thead><tbody>`;
+  ts.forEach((t,ti)=>{h+=`<tr><th class="nm">${esc(t.name)} <span class="hint">${fmt(t.hours)}h</span></th>`+days.map(d=>{
+    if(isWeekend(d)||isHoliday(d))return `<td class="off"></td>`;
+    if(!working(t,d))return `<td><button type="button" class="na" disabled title="勤務開始前">–</button></td>`;
+    const s=attOf(d,t.name),lab=s==="V"?"休":s==="T"?"研":fmt(techHours(t,d));
+    return `<td><button type="button" class="${s}" data-t="${ti}" data-d="${d}" title="${esc(t.name)} ${md(d)} ${ATT[s]}"${canWrite?"":" disabled"}>${lab}</button></td>`}).join("")+`</tr>`});
+  h+=`<tr><th class="nm">キャパ</th>`+days.map(d=>isWeekend(d)||isHoliday(d)?`<td class="off"></td>`:`<td class="tot">${fmt(capOn(d))}</td>`).join("")+`</tr></tbody></table>`;
+  $("att").innerHTML=ts.length?h:`<p class="hint">「キャパ設定」でテクニシャンを登録してください</p>`}
+$("att").addEventListener("click",async e=>{const b=e.target.closest("button[data-t]");if(!b||!canWrite)return;
+  const t=(settings.techs||[])[+b.dataset.t],d=b.dataset.d;if(!t)return;
+  const order=["","V","T","H"],next=order[(order.indexOf(attOf(d,t.name))+1)%4];
+  try{await patchSettings({absence:{[d]:{[t.name]:next}}});renderAtt()}catch(err){toast(errText(err))}});
+function renderDay(){const p=$("dayPanel");if(!selDay){p.hidden=true;return}p.hidden=false;
+  const cap=capOn(selDay),L=dayLoad(selDay),r=cap?L.h/cap*100:0,dt=new Date(selDay+"T00:00"),wk=[0,6].includes(dt.getDay());
+  const rows=L.cars.sort((a,b)=>totalH(b)-totalH(a)).map(c=>`<tr data-id="${esc(c.id)}"><td>${esc(c.customer||"—")}｜${esc(c.plate||"—")}</td><td>${esc(c.kubun||"未選択")}</td><td>${esc(c.vtype||"—")}</td><td class="mono">${fmt(totalH(c))}h</td><td>${esc(c.shipped?"出庫済":(c.state||""))}</td></tr>`).join("");
+  p.innerHTML=`<div class="dayp-h"><h3>${md(selDay)}（${"日月火水木金土"[dt.getDay()]}）</h3><span class="hint">${cap?`予約 ${fmt(L.h)}h／キャパ ${fmt(cap)}h（${Math.round(r)}%）・上限まで残り ${fmt(Math.max(0,cap*settings.limit/100-L.h))}h`:"キャパ0hの日"}</span><span class="sp"></span>`+
+    (wk?"":`<button class="btn" type="button" id="btnHol"${canWrite?"":" disabled"}>${isHoliday(selDay)?"休業日を解除":"休業日にする"}</button>`)+
+    `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+
+    (rows?`<div class="tbl-wrap"><table><thead><tr><th>顧客｜登録番号</th><th>区分</th><th>車型</th><th>工数</th><th>状態</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="hint">この日の入庫予定はありません</p>`)}
+$("cal").addEventListener("click",e=>{const b=e.target.closest(".day");if(!b)return;selDay=b.dataset.d;renderMonth();$("dayPanel").scrollIntoView({block:"nearest",behavior:"smooth"})});
+$("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[data-id]");if(tr){openCar(tr.dataset.id);return}
+  if(e.target.id==="btnDayAdd")openCar(null,{inDate:selDay});
+  if(e.target.id==="btnHol"){try{await patchSettings({holidayMap:{[selDay]:!isHoliday(selDay)}})}catch(err){toast(errText(err))}}});
+$("mPrev").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m-1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
+$("mNext").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m+1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
+$("mToday").addEventListener("click",()=>{const d=new Date();mCur={y:d.getFullYear(),m:d.getMonth()};selDay=todayISO();renderMonth()});
+function showTab(v){const b=v==="b";$("tabBoard").setAttribute("aria-pressed",b);$("tabMonth").setAttribute("aria-pressed",v==="m");$("tabPerson").setAttribute("aria-pressed",v==="p");$("tabHist").setAttribute("aria-pressed",v==="h");
+  $("boardView").hidden=!b;$("monthView").hidden=v!=="m";$("personView").hidden=v!=="p";$("histView").hidden=v!=="h";
+  document.querySelector(".actions").hidden=!b;$("summary").hidden=!b;$("tip").hidden=true;
+  if(v==="m")renderMonth();if(v==="p")renderPerson();if(v==="h")renderHist();try{localStorage.setItem("wbTab",v)}catch(e){}}
+$("tabBoard").addEventListener("click",()=>showTab("b"));
+$("tabMonth").addEventListener("click",()=>showTab("m"));
+$("tabPerson").addEventListener("click",()=>showTab("p"));
+$("tabHist").addEventListener("click",()=>showTab("h"));
+
+/* ---------- 個人作業ボード ---------- */
+let pDay=todayISO();
+function onDay(c,d){if(!c.inDate||c.inDate>d)return false;const t=todayISO();if(c.shipped&&d>=t)return false;
+  const end=c.outDate&&c.outDate>=c.inDate?c.outDate:c.inDate;return d<=end||(!c.shipped&&d===t)}
+const defSeq=c=>{const tm=/^(\d{1,2}):(\d{2})/.exec(c.inTime||"");return +((c.inDate||"2100-01-01").replace(/-/g,""))*10000+(tm?(+tm[1])*100+(+tm[2]):2359)};
+const seqOf=c=>typeof c.seq==="number"?c.seq:defSeq(c);
+function renderPerson(){const d=pDay,dt=new Date(d+"T00:00"),off=isWeekend(d)||isHoliday(d);
+  $("pTitle").textContent=`${md(d)}（${"日月火水木金土"[dt.getDay()]}）`;$("pDate").value=d;
+  const list=[...cars.values()].filter(c=>onDay(c,d));
+  const ts=settings.techs||[],names=new Set(ts.map(t=>t.name));
+  const allSegs=liveSegs();
+  const extra=[...new Set(allSegs.map(s=>s.tech).filter(n=>n&&!names.has(n)))];
+  const L0=toMin(settings.lunchFrom),L1=toMin(settings.lunchTo);
+  const xOf=m=>Math.max(0,Math.min(AXW,(m-AX0)*PXM));
+  let ticks="";for(let m=AX0;m<=AX1;m+=60)ticks+=`<span class="tk" style="left:${xOf(m)}px">${m/60}</span>`;
+  const lunch=L0!=null&&L1!=null&&L1>L0?`<div class="lunch" style="left:${xOf(L0)}px;width:${xOf(L1)-xOf(L0)}px"></div>`:"";
+  /* 未割当：その日に工場にいる車両の、担当が決まっていない作業 */
+  const unas=list.flatMap(segsOf).filter(s=>!s.tech);
+  const unasH=unas.reduce((a,s)=>a+s.h,0);
+  let html=`<section class="pr unas" data-tech=""><div class="pr-h"><span class="nm">未割当</span><span class="ld">${unas.length}件・${fmt(unasH)}h</span></div><div class="pr-c">${unas.map(s=>pcHTML(cars.get(s.cid),s)).join("")||'<span class="none">未割当の作業はありません</span>'}</div></section>`;
+  let sumH=0,sumC=0;
+  for(const r of [...ts.map(t=>({name:t.name,t})),...extra.map(n=>({name:n,t:null}))]){
+    const places=r.t?(flowTech(r.t,allSegs).get(d)||[]):[];
+    const cap=r.t&&!off?techHours(r.t,d):0,st=r.t?(!working(r.t,d)?"勤務開始前":attOf(d,r.name)?ATT[attOf(d,r.name)]:""):"未登録";
+    const h=places.reduce((a,p)=>a+(p.end-p.start-lunchOverlap(p.start,p.end))/60,0);
+    if(r.t)sumC+=cap;sumH+=h;
+    const rate=cap?h/cap*100:(h?999:0),lv=cap?lvl(rate):(h?"over":"");
+    const S=toMin(settings.dayStart)??540,capEnd=cap?addWork(S,cap*60):null;
+    const blocks=places.map(p=>{const c=cars.get(p.cid),fam=famOf(c.kubun),ph=(p.end-p.start-lunchOverlap(p.start,p.end))/60;
+      const part=p.n>1?`作業${p.i+1}/${p.n}`:"";
+      const flow=[p.cont?"前日から":"",p.more?"翌日へ続く":""].filter(Boolean).join("・");
+      return `<div role="button" tabindex="0" class="pc blk${fam?" "+fam:""}${c.state==="完成"?" done":""}${p.cont?" cont":""}${p.more?" more":""}" draggable="${canWrite}" data-id="${esc(p.cid)}" data-sid="${esc(p.sid)}" data-start="${p.start}" data-ph="${ph}" data-h="${p.h}" style="left:${xOf(p.start)}px;width:${Math.max(24,xOf(p.end)-xOf(p.start)-3)}px"><span class="t">${esc(c.customer||"（顧客名なし）")}｜${esc(c.plate||"（登録番号なし）")}</span><span class="s">${fmtMin(p.start)}–${fmtMin(p.end)}・${fmt(ph)}h${part?"・"+part:""}${flow?"・"+flow:""}</span><span class="s">${esc(inLabel(c))}</span>${canWrite?'<span class="rz" title="右端をドラッグで長さを変更"></span>':""}</div>`}).join("");
+    const capMk=capEnd!=null?`<div class="capmk" style="left:${xOf(capEnd)}px" title="終業 ${fmtMin(capEnd)}"></div>`:"";
+    /* 工場にいるが、この日に作業予定がない車両（部品待ち・合意待ちなど） */
+    const placedIds=new Set(places.map(p=>p.cid));
+    const idle=list.filter(c=>(c.tech||"")===r.name&&!placedIds.has(c.id)&&c.state!=="完成");
+    const closed=!cap,why=st||(off?(isHoliday(d)?"休業日":"休日"):"作業不可");
+    const after=!closed&&capEnd<AX1?`<div class="after" style="left:${xOf(capEnd)}px;width:${AXW-xOf(capEnd)}px">${attOf(d,r.name)==="H"?"<span>半休</span>":""}</div>`:"";
+    html+=`<section class="pr${closed?" closed":lv?" lv-"+lv:""}" data-tech="${esc(r.name)}"><div class="pr-h"><span class="nm">${esc(r.name)}${st?`<span class="st">${esc(st)}</span>`:off?`<span class="st">休み</span>`:""}</span>`+
+      `<span class="pbar"><i style="width:${cap?Math.min(100,rate):h?100:0}%"></i></span><span class="ld">${fmt(h)}/${fmt(cap)}h ${cap?`<span class="p">${Math.round(rate)}%</span>`:""}</span></div>`+
+      `<div class="pr-b"><div class="tl${closed?" closed":""}" style="width:${AXW}px">${closed?`<div class="closed-fill"><span>${esc(why)}</span></div>`:`${lunch}${after}${capMk}${blocks||'<span class="none">ここへドラッグで割り当て</span>'}`}</div>`+
+      (idle.length?`<div class="carry"><span class="cl">この日の作業予定なし（上の時間軸へドラッグで、この日の作業に入れられます）</span>${idle.map(c=>pcHTML(c,null,true)).join("")}</div>`:"")+`</div></section>`}
+  $("pv").innerHTML=`<div class="axis"><div class="ax-h"></div><div class="ax" style="width:${AXW}px">${ticks}</div></div>`+html;
+  $("pSum").innerHTML=`<span class="chip">工場内 <b>${list.length}</b>台</span><span class="chip">この日の作業 <b>${fmt(sumH)}</b>h／キャパ <b>${fmt(sumC)}</b>h</span>${unas.length?`<span class="chip warn">未割当 <b>${unas.length}</b>件</span>`:""}`}
+
+/* 時間軸：8時〜19時。各担当の作業を並び順に、始業から工数分ずつ詰める。昼休みと終業後は飛ばし、残りは次の作業日へ引き継ぐ */
+const AX0=8*60,AX1=19*60,PXM=84/60,AXW=(AX1-AX0)*PXM;
+const toMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||"");return m?(+m[1])*60+(+m[2]):null};
+const fmtMin=m=>Math.floor(m/60)+":"+pad(Math.round(m%60));
+function lunchOverlap(a,b){const L0=toMin(settings.lunchFrom),L1=toMin(settings.lunchTo);if(L0==null||L1==null||L1<=L0)return 0;return Math.max(0,Math.min(b,L1)-Math.max(a,L0))}
+function addWork(start,mins){const L0=toMin(settings.lunchFrom),L1=toMin(settings.lunchTo);let t=start,rem=mins;
+  if(L0!=null&&L1!=null&&L1>L0){if(t>=L0&&t<L1)t=L1;if(t<L0&&t+rem>L0){rem-=L0-t;t=L1}}return t+rem}
+const nextISO=d=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+1);return isoOf(x.getFullYear(),x.getMonth(),x.getDate())};
+/* 1台の作業を「作業1・作業2…」に分けたもの。最後の作業は残り時間 */
+function segsOf(c){const T=Math.max(0.5,totalH(c)),base=Array.isArray(c.segs)&&c.segs.length?c.segs:[{id:"main"}];let used=0;
+  return base.map((s,i)=>{const last=i===base.length-1,h=last?Math.max(0.5,T-used):Math.max(0.25,+s.h||0.5);used+=h;
+    const h2=last&&s.fix&&+s.h>0?Math.max(0.25,+s.h):h;
+    return{cid:c.id,sid:s.id,h:h2,seq:typeof s.seq==="number"?s.seq:seqOf(c)+i*0.01,tech:s.tech!=null?s.tech:(c.tech||""),from:s.from||"",at:typeof s.at==="number"?s.at:null,fix:!!s.fix,i,n:base.length}})}
+/* 保存用：時間軸の予定（開始時刻・長さ）も残す */
+const segStore=s=>({id:s.sid,...(s.i<s.n-1||s.fix?{h:s.h}:{}),...(s.fix?{fix:true}:{}),seq:s.seq,tech:s.tech,...(s.from?{from:s.from}:{}),...(s.at!=null?{at:s.at}:{})});
+const liveSegs=()=>[...cars.values()].filter(c=>!c.shipped&&c.inDate).flatMap(segsOf);
+function flowTech(t,all){const S=toMin(settings.dayStart)??540,L0=toMin(settings.lunchFrom),L1=toMin(settings.lunchTo);
+  const segs=all.filter(s=>s.tech===t.name).sort((a,b)=>a.seq-b.seq),out=new Map();
+  const capEndOn=d=>{if(isWeekend(d)||isHoliday(d))return null;const h=techHours(t,d);return h>0?addWork(S,h*60):null};
+  let day=null,cur=S;
+  for(const s of segs){const c=cars.get(s.cid);
+    const st=s.from&&s.from>c.inDate?s.from:c.inDate;
+    if(!day||day<st){day=st;cur=S}
+    if(day===c.inDate){const a=toMin(c.inTime);if(a!=null&&a>cur)cur=a}
+    if(s.at!=null&&day===st&&s.at>cur)cur=s.at
+    let rem=Math.round(s.h*60),first=true,g=0;
+    while(rem>0&&g++<400){const ce=capEndOn(day);
+      if(L0!=null&&cur>=L0&&cur<L1)cur=L1;
+      if(ce==null||cur>=ce){day=nextISO(day);cur=S;continue}
+      const avail=ce-cur-lunchOverlap(cur,ce),take=Math.min(rem,avail),end=addWork(cur,take);
+      if(!out.has(day))out.set(day,[]);
+      out.get(day).push({...s,start:cur,end,cont:!first,more:rem-take>0});
+      rem-=take;cur=end;first=false}}
+  return out}
+function pcHTML(c,s,idle){const h=s?s.h:totalH(c),fam=famOf(c.kubun),part=s&&s.n>1?`作業${s.i+1}/${s.n}・`:"";
+  return `<div role="button" tabindex="0" class="pc${fam?" "+fam:""}${c.state==="完成"?" done":""}" draggable="${canWrite}" data-id="${esc(c.id)}" data-sid="${esc(s?s.sid:"")}" style="width:${idle?180:Math.max(150,Math.min(420,90+h*28))}px"><span class="t">${esc(c.customer||"（顧客名なし）")}｜${esc(c.plate||"（登録番号なし）")}</span><span class="s">${esc(inLabel(c))}・${part}${h?fmt(h)+"h・":""}${esc(c.state||"")}</span></div>`}
+const pv=$("pv");
+pv.addEventListener("keydown",e=>{const b=e.target.closest(".pc");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openCar(b.dataset.id)}});
+pv.addEventListener("click",e=>{const b=e.target.closest(".pc");if(b){$("tip").hidden=true;openCar(b.dataset.id)}});
+let grabDX=0;
+pv.addEventListener("dragstart",e=>{const b=e.target.closest(".pc");if(!b)return;if(sizing){e.preventDefault();return}$("tip").hidden=true;grabDX=b.classList.contains("blk")?e.clientX-b.getBoundingClientRect().left:0;e.dataTransfer.setData("text/plain",b.dataset.id+"|"+(b.dataset.sid||""));e.dataTransfer.effectAllowed="move";b.classList.add("dragging")});
+pv.addEventListener("dragend",e=>{e.target.closest?.(".pc")?.classList.remove("dragging");pv.querySelectorAll(".pr.over").forEach(x=>x.classList.remove("over"));pv.querySelectorAll(".dropmk").forEach(x=>x.remove())});
+pv.addEventListener("dragover",e=>{const r=e.target.closest(".pr");if(!r||!canWrite||r.classList.contains("closed")){if(r&&r.classList.contains("closed"))e.dataTransfer.dropEffect="none";return}e.preventDefault();pv.querySelectorAll(".pr.over").forEach(x=>x!==r&&x.classList.remove("over"));r.classList.add("over");
+  const tl=r.dataset.tech?r.querySelector(".tl"):null,at=tl?dropAt(tl,e):null;let mk=pv.querySelector(".dropmk");
+  if(at==null){mk&&mk.remove();return}
+  if(!mk||mk.parentNode!==tl){mk&&mk.remove();mk=document.createElement("div");mk.className="dropmk";mk.innerHTML="<span></span>";tl.appendChild(mk)}
+  mk.style.left=xOf2(at)+"px";mk.firstChild.textContent=fmtMin(at)+"から"});
+/* ドロップした位置の時刻（15分きざみ）。時間軸の外なら null */
+const xOf2=m=>Math.max(0,Math.min(AXW,(m-AX0)*PXM));
+function dropAt(tl,e){const b=tl.getBoundingClientRect(),clientX=e.clientX;if(clientX<b.left||clientX>b.right||e.clientY<b.top-6||e.clientY>b.bottom+6)return null;
+  const S=toMin(settings.dayStart)??540,m=AX0+(clientX-grabDX-b.left)/PXM;return Math.max(S,Math.min(AX1-15,Math.round(m/15)*15))}
+pv.addEventListener("drop",async e=>{const r=e.target.closest(".pr");if(!r)return;e.preventDefault();r.classList.remove("over");
+  if(r.classList.contains("closed")){toast("この日は作業できない担当です");return}
+  const [cid,sid0]=e.dataTransfer.getData("text/plain").split("|"),c=cars.get(cid);if(!c)return;
+  const segs=segsOf(c),me=segs.find(s=>s.sid===sid0)||segs[segs.length-1],tech=r.dataset.tech,key=(a,b)=>a+"|"+b;
+  let seq=me.seq;const area=tech?r.querySelector(".tl"):null,at=area?dropAt(area,e):null;
+  pv.querySelectorAll(".dropmk").forEach(x=>x.remove());
+  if(tech){
+    const chips=[...area.querySelectorAll(".pc")].filter(x=>key(x.dataset.id,x.dataset.sid)!==key(cid,me.sid));
+    const ab=area.getBoundingClientRect(),px=at!=null?ab.left+(at-AX0)*PXM:e.clientX;
+    const before=chips.find(x=>{const b=x.getBoundingClientRect();return px<b.left+b.width/2});
+    const lst=liveSegs().filter(s=>s.tech===tech&&key(s.cid,s.sid)!==key(cid,me.sid)).sort((a,b)=>a.seq-b.seq);
+    const idx=x=>lst.findIndex(s=>key(s.cid,s.sid)===key(x.dataset.id,x.dataset.sid));
+    if(before){const bi=idx(before),prev=lst[bi-1];seq=prev?(prev.seq+lst[bi].seq)/2:lst[bi].seq-100}
+    else if(chips.length){const li=idx(chips[chips.length-1]),nx=lst[li+1];seq=nx?(lst[li].seq+nx.seq)/2:lst[li].seq+100}
+    else{const base=+(pDay.replace(/-/g,""))*10000+1,nx=lst.find(s=>s.seq>=base);const pv2=lst.filter(s=>s.seq<base).pop();
+      seq=nx&&pv2?(pv2.seq+nx.seq)/2:nx?nx.seq-1:base}}
+  const from=tech?pDay:me.from;
+  if(tech===me.tech&&seq===me.seq&&from===me.from&&at===me.at)return;
+  const stored=segs.map(segStore);
+  const ns=stored.map(s=>{if(s.id!==me.sid)return s;const o={...s,seq,tech,...(from?{from}:{})};if(at!=null)o.at=at;else delete o.at;return o});
+  try{await writeCar(cid,{segs:ns,tech:ns[0].tech,updated:new Date().toISOString()});if(tech!==me.tech)toast(tech?`${me.n>1?`作業${me.i+1}の`:""}担当を${tech}に変更しました`:"未割当に戻しました")}catch(err){toast(errText(err))}});
+/* 右端をドラッグして作業の長さを変える（15分きざみ）。この作業だけが長く・短くなる */
+let sizing=null,sizedAt=0;
+pv.addEventListener("pointerdown",e=>{const h=e.target.closest(".rz");if(!h||!canWrite)return;const b=h.closest(".blk");
+  e.preventDefault();e.stopPropagation();$("tip").hidden=true;
+  sizing={b,id:b.dataset.id,sid:b.dataset.sid,x0:e.clientX,w0:b.getBoundingClientRect().width,start:+b.dataset.start,ph:+b.dataset.ph,h:+b.dataset.h,nh:null};
+  b.classList.add("sizing");b.setAttribute("draggable","false");try{h.setPointerCapture(e.pointerId)}catch(_){}});
+addEventListener("pointermove",e=>{if(!sizing)return;$("tip").hidden=true;const z=sizing,w=Math.max(20,z.w0+e.clientX-z.x0);
+  const end=z.start+(w+3)/PXM,work=Math.max(15,end-z.start-lunchOverlap(z.start,end));
+  const nh=Math.max(0.25,Math.round((z.h-z.ph+work/60)*4)/4);z.nh=nh;
+  z.b.style.width=w+"px";const s=z.b.querySelector(".s");if(s)s.textContent=`${fmtMin(z.start)}–${fmtMin(addWork(z.start,Math.round((nh-(z.h-z.ph))*60)))}・この作業 ${fmt(nh)}h`});
+async function endSize(){if(!sizing)return;const z=sizing;sizing=null;sizedAt=Date.now();z.b.classList.remove("sizing");
+  if(z.nh==null||Math.abs(z.nh-z.h)<0.01){renderPerson();return}
+  const c=cars.get(z.id);if(!c){renderPerson();return}
+  const segs=segsOf(c),last=segs[segs.length-1];
+  const ns=segs.map(s=>{const o=segStore(s);if(s.sid===z.sid){o.h=z.nh;if(s===last)o.fix=true}else if(s===last&&!s.fix&&segs.length>1){o.h=s.h;o.fix=true}return o});
+  try{await writeCar(z.id,{segs:ns,updated:new Date().toISOString()});toast(`作業の長さを ${fmt(z.nh)}h にしました`)}catch(err){toast(errText(err));renderPerson()}}
+addEventListener("pointerup",endSize);addEventListener("pointercancel",endSize);
+pv.addEventListener("click",e=>{if(Date.now()-sizedAt<400||e.target.closest(".rz")){e.stopPropagation();e.preventDefault()}},true);
+/* カーソルを合わせるとカードを表示 */
+pv.addEventListener("mouseover",e=>{const b=e.target.closest(".pc");if(!b||sizing||b.classList.contains("dragging"))return;const c=cars.get(b.dataset.id);if(!c)return;
+  const tip=$("tip");tip.innerHTML=cardHTML(c,todayISO());tip.hidden=false;tipAt=Date.now();
+  const rc=b.getBoundingClientRect(),w=tip.offsetWidth,hh=tip.offsetHeight;
+  let x=rc.right+10;if(x+w>innerWidth-8)x=Math.max(8,rc.left-w-10);let y=Math.min(rc.top,innerHeight-hh-8);
+  tip.style.left=x+"px";tip.style.top=Math.max(8,y)+"px"});
+pv.addEventListener("mouseout",e=>{const b=e.target.closest(".pc");if(b&&!b.contains(e.relatedTarget))$("tip").hidden=true});
+let tipAt=0;addEventListener("scroll",()=>{if(Date.now()-tipAt>400)$("tip").hidden=true},{passive:true});
+const shiftDay=n=>{const d=new Date(pDay+"T00:00");d.setDate(d.getDate()+n);pDay=isoOf(d.getFullYear(),d.getMonth(),d.getDate());renderPerson()};
+$("pPrev").addEventListener("click",()=>shiftDay(-1));
+$("pNext").addEventListener("click",()=>shiftDay(1));
+$("pToday").addEventListener("click",()=>{pDay=todayISO();renderPerson()});
+$("pDate").addEventListener("change",()=>{if($("pDate").value){pDay=$("pDate").value;renderPerson()}});
+
+/* ---------- settings ---------- */
+let setQ=Promise.resolve(),settingsExists=false;
+const isObj=x=>x&&typeof x==="object"&&!Array.isArray(x);
+function deepMerge(a,b){const o={...a};for(const k in b)o[k]=isObj(b[k])&&isObj(a[k])?deepMerge(a[k],b[k]):b[k];return o}
+/* 変えた部分だけを送る。勤務表や休業日は日付・人ごとに混ぜ合わせて保存されるので、同時に別のマスを変えても消えない */
+function patchSettings(patch){settings=deepMerge(settings,patch);render();if(!$("monthView").hidden)renderMonth();
+  if(local||!db)return Promise.resolve();const snap=JSON.parse(JSON.stringify(patch));
+  setQ=setQ.catch(()=>{}).then(async()=>{const ref=db.doc("settings/main");if(!settingsExists){const cur=await ref.get();if(!cur.exists){await ref.set(deepMerge(DEFSET,snap));settingsExists=true;return}settingsExists=true}await ref.update(snap)});return setQ}
+function staffRowHTML(t){return `<div class="staff-row"><input type="text" value="${esc(t.name||"")}" aria-label="名前"><input type="number" min="0" max="12" step="0.5" value="${esc(t.hours??8)}" aria-label="1日の時間"><span>h</span><input type="date" value="${esc(t.from||"")}" aria-label="勤務開始日"><button class="btn" type="button" data-rm>削除</button></div>`}
+const hhmm=s=>{const m=toMin(s);return m==null?"":pad(Math.floor(m/60))+":"+pad(m%60)};
+$("btnSettings").addEventListener("click",()=>{$("s_limit").value=settings.limit;$("s_start").value=hhmm(settings.dayStart);$("s_l0").value=hhmm(settings.lunchFrom);$("s_l1").value=hhmm(settings.lunchTo);$("setNote").textContent="";
+  $("staffRows").innerHTML=(settings.techs||[]).map(staffRowHTML).join("");$("btnSetSave").disabled=!canWrite;renderAtt();renderBk();restoreData=null;$("restoreFile").value="";renderRestore();$("bkFallback").hidden=true;$("bkNote").textContent="";$("dlgSet").showModal()});
+$("attPrev").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m-1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderAtt();if(!$("monthView").hidden)renderMonth()});
+$("attNext").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m+1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderAtt();if(!$("monthView").hidden)renderMonth()});
+$("btnStaffAdd").addEventListener("click",()=>$("staffRows").insertAdjacentHTML("beforeend",staffRowHTML({name:"",hours:8,from:""})));
+$("staffRows").addEventListener("click",e=>{if(e.target.matches("[data-rm]"))e.target.closest(".staff-row").remove()});
+$("btnSetSave").addEventListener("click",async()=>{const limit=parseFloat($("s_limit").value),note=$("setNote");
+  const techs=[...$("staffRows").querySelectorAll(".staff-row")].map(r=>{const[a,b,c]=r.querySelectorAll("input");return{name:a.value.trim(),hours:Math.max(0,parseFloat(b.value)||0),from:c.value}}).filter(t=>t.name);
+  if(!(limit>0&&limit<=100)){note.textContent="予約上限は1〜100%で入力してください";return}
+  if(!techs.length){note.textContent="テクニシャンを1人以上入力してください";return}
+  if(new Set(techs.map(t=>t.name)).size!==techs.length){note.textContent="同じ名前が2回入っています";return}
+  const dayStart=$("s_start").value||"09:00",lunchFrom=$("s_l0").value,lunchTo=$("s_l1").value;
+  if(lunchFrom&&lunchTo&&lunchTo<=lunchFrom){note.textContent="昼休みの終了は開始より後にしてください";return}
+  try{await patchSettings({limit,techs,dayStart,lunchFrom,lunchTo});$("dlgSet").close();toast("キャパ設定を保存しました")}catch(e){note.textContent=errText(e)}});
+try{const v=localStorage.getItem("wbTab");if(v==="m"||v==="p"||v==="h")showTab(v)}catch(e){}
+
+/* ---------- 整備履歴・月別請求 ---------- */
+let invoices=new Map(),hTab="list",sampleFn=null,sampleCaps=null;
+let bCur=(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}})();
+const nrm=s=>String(s??"").normalize("NFKC").replace(/[\s　]/g,"").toLowerCase();
+const yen=n=>"¥"+Math.round(+n||0).toLocaleString("ja-JP");
+const num=v=>{const x=+String(v??"").replace(/[^\d.\-]/g,"");return isFinite(x)?x:0};
+const ymd=s=>s?String(s).replace(/-/g,"/"):"";
+const cleanCo=s=>String(s||"").replace(/\s*御中\s*$/,"").trim();
+function invSummary(v){const ls=v.lines||[];
+  const heads=ls.filter(l=>l.t==="TXT").map(l=>String(l.desc||"").replace(/\*+/g,"").trim()).filter(Boolean);
+  if(heads.length)return heads.join(" / ");
+  return ls.filter(l=>l.t==="L"||l.t==="SUB").map(l=>l.desc).filter(Boolean).slice(0,3).join(" / ")}
+function invText(v){return nrm([v.summary,...(v.lines||[]).map(l=>(l.desc||"")+" "+(l.code||""))].join(" "))}
+/* 検索語は空白で区切ると「すべて含む」で探す。どれも一部一致 */
+const terms=s=>String(s||"").normalize("NFKC").split(/[\s\u3000]+/).map(nrm).filter(Boolean);
+const hasAll=(text,ts)=>ts.every(t=>text.includes(t));
+function histMatches(){const qc=terms($("hq_c").value),qp=terms($("hq_p").value),qch=terms($("hq_ch").value),qw=terms($("hq_w").value);
+  return [...invoices.values()].filter(v=>(!qc.length||hasAll(nrm(v.billTo)+"|"+nrm(v.customer),qc))&&(!qp.length||hasAll(nrm(v.plate),qp))&&(!qch.length||hasAll(nrm(v.chassis),qch))&&(!qw.length||hasAll(invText(v),qw)))
+    .sort((a,b)=>String(b.issueDate||"").localeCompare(String(a.issueDate||""))||String(b.docNo).localeCompare(String(a.docNo)))}
+function renderHist(){$("hsList").setAttribute("aria-pressed",hTab==="list");$("hsBill").setAttribute("aria-pressed",hTab==="bill");
+  $("hList").hidden=hTab!=="list";$("hBill").hidden=hTab!=="bill";hTab==="list"?renderHList():renderBill()}
+function renderHList(){const rows=histMatches(),sum=rows.reduce((a,v)=>a+num(v.total),0);
+  $("hCount").textContent=invoices.size?`${rows.length}件・請求金額の合計 ${yen(sum)}`:"";
+  $("hBody").innerHTML=rows.length?rows.map(v=>`<tr data-id="${esc(v.id)}"><td class="mono">${esc(ymd(v.issueDate))}</td><td>${esc(v.billTo||v.customer||"")}${v.customer&&nrm(v.customer)!==nrm(v.billTo)?`<br><span class="hint">${esc(v.customer)}</span>`:""}</td><td>${esc(v.plate||"")}</td><td class="mono">${esc(v.chassis||"")}</td><td class="mono r">${v.mileage?num(v.mileage).toLocaleString("ja-JP")+"km":""}</td><td class="wrap">${esc(v.summary||"")}</td><td class="mono r">${esc(yen(v.total))}</td></tr>`).join("")
+    :`<tr><td colspan="7" class="hint">${invoices.size?"条件に合う履歴はありません":"まだ履歴がありません。「請求書を取り込む」から請求書PDFを読み込んでください"}</td></tr>`}
+function renderBill(){const{y,m}=bCur,key=y+"-"+pad(m+1);$("bTitle").textContent=`${y}年${m+1}月`;
+  const g=new Map();for(const v of invoices.values()){if(!String(v.issueDate||"").startsWith(key))continue;const nm=v.billTo||v.customer||"（請求先なし）",k=nrm(nm);
+    const o=g.get(k)||{name:nm,n:0,parts:0,labor:0,sublet:0,ex:0,tax:0,total:0};o.n++;o.parts+=num(v.parts);o.labor+=num(v.labor);o.sublet+=num(v.sublet);o.ex+=num(v.exTax);o.tax+=num(v.tax);o.total+=num(v.total);g.set(k,o)}
+  const rows=[...g.entries()].sort((a,b)=>b[1].total-a[1].total),T=rows.reduce((a,[,o])=>{for(const k in o)if(k!=="name")a[k]=(a[k]||0)+o[k];return a},{});
+  const cells=o=>`<td class="mono r">${o.n||0}</td><td class="mono r">${yen(o.parts)}</td><td class="mono r">${yen(o.labor)}</td><td class="mono r">${yen(o.sublet)}</td><td class="mono r">${yen(o.ex)}</td><td class="mono r">${yen(o.tax)}</td><td class="mono r"><b>${yen(o.total)}</b></td>`;
+  $("bBody").innerHTML=rows.length?rows.map(([k,o])=>`<tr data-bill="${esc(o.name)}"><td>${esc(o.name)}</td>${cells(o)}</tr>`).join(""):`<tr><td colspan="8" class="hint">この月の請求データはありません</td></tr>`;
+  $("bFoot").innerHTML=rows.length?`<tr><th>合計（${rows.length}社）</th>${cells(T)}</tr>`:"";
+  $("bSum").innerHTML=rows.length?`<span class="chip">請求金額 <b>${yen(T.total)}</b></span><span class="chip">${T.n}件</span>`:""}
+["hq_c","hq_p","hq_ch","hq_w"].forEach(k=>$(k).addEventListener("input",renderHList));
+$("hqClear").addEventListener("click",()=>{["hq_c","hq_p","hq_ch","hq_w"].forEach(k=>$(k).value="");renderHList()});
+$("hsList").addEventListener("click",()=>{hTab="list";renderHist()});
+$("hsBill").addEventListener("click",()=>{hTab="bill";renderHist()});
+$("bPrev").addEventListener("click",()=>{const d=new Date(bCur.y,bCur.m-1,1);bCur={y:d.getFullYear(),m:d.getMonth()};renderBill()});
+$("bNext").addEventListener("click",()=>{const d=new Date(bCur.y,bCur.m+1,1);bCur={y:d.getFullYear(),m:d.getMonth()};renderBill()});
+$("bBody").addEventListener("click",e=>{const tr=e.target.closest("tr[data-bill]");if(!tr)return;["hq_p","hq_ch","hq_w"].forEach(k=>$(k).value="");$("hq_c").value=tr.dataset.bill;hTab="list";renderHist()});
+$("hBody").addEventListener("click",e=>{const tr=e.target.closest("tr[data-id]");if(tr)openInv(tr.dataset.id)});
+function showHistFor(field,val){showTab("h");["hq_c","hq_p","hq_ch","hq_w"].forEach(k=>$(k).value="");$(field).value=val;hTab="list";renderHist()}
+
+/* 請求書の詳細 */
+let invView=null,invDelArmed=false;
+function openInv(id){const v=invoices.get(id);if(!v)return;invView=id;invDelArmed=false;$("btnInvDel").textContent="削除";$("btnInvDel").disabled=!canWrite;
+  $("invTitle").textContent=`請求書 ${v.docNo}`;
+  const info=[["発行日",ymd(v.issueDate)],["作業日付",ymd(v.workDate)],["請求先",v.billTo],["お客様",v.customer],["登録番号",v.plate],["シャシNo",v.chassis],["モデル",v.model],["エンジン番号",v.engine],["走行距離",v.mileage?num(v.mileage).toLocaleString("ja-JP")+"km":""],["WIP番号",v.wip],["作業番号",v.jobNo],["担当者",v.staff],["受付担当",v.receiver],["初度登録日",ymd(v.firstReg)]];
+  const kind={L:"作業",P:"部品",SUB:"外注",TXT:""};
+  $("invBody").innerHTML=`<dl class="invinfo">${info.filter(([,x])=>x).map(([k,x])=>`<div><dt>${k}</dt><dd>${esc(x)}</dd></div>`).join("")}</dl>`+
+    `<div class="tbl-wrap"><table class="htbl"><thead><tr><th>作業</th><th>区分</th><th>コード</th><th>内容</th><th class="r">数量</th><th class="r">単価</th><th class="r">金額</th></tr></thead><tbody>`+
+    (v.lines||[]).map(l=>l.t==="TXT"?`<tr class="txt"><td class="mono">${esc(l.g||"")}</td><td colspan="6"><b>${esc(String(l.desc||"").replace(/\*+/g,"").trim())}</b></td></tr>`
+      :`<tr><td class="mono">${esc(l.g||"")}</td><td>${kind[l.t]||esc(l.t||"")}</td><td class="mono">${esc(l.code||"")}</td><td class="wrap">${esc(l.desc||"")}</td><td class="mono r">${l.qty?esc(l.qty):""}</td><td class="mono r">${l.unit?yen(l.unit):""}</td><td class="mono r">${yen(l.amt)}</td></tr>`).join("")+
+    `</tbody></table></div><div class="invtot"><span>部品 ${yen(v.parts)}</span><span>作業 ${yen(v.labor)}</span><span>外注 ${yen(v.sublet)}</span><span>税抜 ${yen(v.exTax)}</span><span>消費税 ${yen(v.tax)}</span><b>請求金額 ${yen(v.total)}</b></div>`;
+  $("btnInvVeh").hidden=!v.chassis&&!v.plate;$("dlgInvView").showModal()}
+$("btnInvVeh").addEventListener("click",()=>{const v=invoices.get(invView);$("dlgInvView").close();v.chassis?showHistFor("hq_ch",v.chassis):showHistFor("hq_p",v.plate)});
+$("btnInvDel").addEventListener("click",async()=>{if(!invDelArmed){invDelArmed=true;$("btnInvDel").textContent="本当に削除する";return}
+  try{if(local||!db){invoices.delete(invView);renderHist()}else await db.collection("invoices").doc(invView).delete();$("dlgInvView").close();toast("削除しました")}catch(e){toast(errText(e))}});
+
+/* カードの中に、同じ登録番号の整備履歴を出す */
+function renderCardHist(c){const b=$("histBlock");const p=c&&nrm(c.plate);
+  const hs=p?[...invoices.values()].filter(v=>nrm(v.plate)===p).sort((a,b)=>String(b.issueDate).localeCompare(String(a.issueDate))):[];
+  if(!hs.length){b.hidden=true;return}b.hidden=false;
+  b.innerHTML=`<label>整備履歴（同じ登録番号 ${hs.length}件）</label><div class="chist">${hs.slice(0,5).map(v=>`<button type="button" class="chrow" data-id="${esc(v.id)}"><span class="mono">${esc(ymd(v.issueDate))}</span><span class="wrap">${esc(v.summary||"")}</span><span class="mono">${esc(yen(v.total))}</span></button>`).join("")}</div>${hs.length>5?`<button class="btn" type="button" data-all>すべての履歴を見る</button>`:""}`}
+$("histBlock").addEventListener("click",e=>{const r=e.target.closest(".chrow");if(r){openInv(r.dataset.id);return}
+  if(e.target.matches("[data-all]")){const c=cars.get(editing);$("dlgCar").close();showHistFor("hq_p",c.plate)}});
+
+/* 請求書の取り込み（PDF・画像をClaudeが読み取る） */
+let invParsed=[];
+const loadScript=src=>new Promise((ok,ng)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>ng(new Error("load"));document.head.appendChild(s)});
+async function ensurePdf(){if(window.pdfjsLib&&window.pdfjsWorker)return;
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")}
+async function filesToImages(files){const out=[];
+  for(const f of files){if(f.type==="application/pdf"||/\.pdf$/i.test(f.name)){await ensurePdf();
+      const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+      for(let i=1;i<=pdf.numPages&&out.length<60;i++){$("invProg").textContent=`${f.name} の ${i}/${pdf.numPages}ページを準備中…`;
+        const pg=await pdf.getPage(i),vp=pg.getViewport({scale:1.6}),cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;
+        const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);await pg.render({canvasContext:cx,viewport:vp}).promise;
+        out.push(await new Promise(r=>cv.toBlob(r,"image/jpeg",0.85)))}}
+    else if(/^image\//.test(f.type))out.push(f)}
+  return out}
+const INV_PROMPT=n=>`これはスカニアジャパンの「納品請求書」をスキャンした画像です（${n}ページ、順番どおり）。1つの請求書が複数ページにまたがることがあります。
+各ページを読み取り、ページごとに1つのオブジェクトを並べたJSON配列だけを返してください。
+形式: [{"page":1,"docNo":"10323504","issueDate":"2026-10-02","workDate":"2026-09-25","billTo":"","customer":"","custCode":"","staff":"","receiver":"","model":"","chassis":"","engine":"","mileage":0,"plate":"","firstReg":"2018-11-29","wip":"W 36124","jobNo":"","lines":[{"g":"04","t":"L","code":"18655036-4","desc":"キャブチルトホース交換","qty":"","unit":0,"amt":15435}],"totals":null}]
+ルール:
+- docNo=ドキュメント番号、issueDate=発行日、workDate=作業日付（26/10/06 は 2026-10-06）、日付はすべて YYYY-MM-DD
+- billTo=ご請求先の会社名、customer=お客様連絡先の会社名（どちらも住所と「御中」は除く）、custCode=取引先コード
+- staff=担当者、receiver=受付担当、chassis=車台番号、engine=エンジン番号、mileage=走行距離（数値）、plate=登録番号、wip=W.I.P番号、jobNo=作業番号
+- lines は作業内容・部品明細の各行。g=左端の作業番号（02など）、t は "L"（作業）・"P"（部品）・"SUB"（外注）・"TXT"（見出し行、*** で囲まれた行）
+- code は品番・作業コード（"L TXT" の行は code を空にして t を "TXT"、"L SUB" の行は t を "SUB"）
+- desc は説明。2行目以降の補足（#010554 など）も空白でつないで含める。英語で同じ語が2行重なる場合は1回だけ
+- qty=数量、unit=単価、amt=金額。金額はカンマなしの数値。「小計」の行は lines に入れない
+- totals は、そのページの下に合計欄（部品・作業・外注・税抜き金額・消費税・ご請求金額）が記入されている場合だけ {"parts":0,"surcharge":0,"labor":0,"sublet":0,"menu":0,"exTax":0,"tax":0,"total":0}、空欄なら null
+- 読めない項目は空文字。住所・電話番号・口座番号は含めない`;
+const HEAD=["issueDate","workDate","billTo","customer","custCode","staff","receiver","model","chassis","engine","mileage","plate","firstReg","wip","jobNo"];
+function mergePages(pages){const m=new Map();let anon=0;
+  for(const p of pages){if(!p||typeof p!=="object")continue;const k=String(p.docNo||"").replace(/\D/g,"")||("x"+(++anon));
+    let o=m.get(k);if(!o){o={docNo:k,lines:[]};m.set(k,o)}
+    for(const f of HEAD)if((o[f]==null||o[f]==="")&&p[f]!=null&&p[f]!=="")o[f]=p[f];
+    for(const l of Array.isArray(p.lines)?p.lines:[]){let t=String(l.t||"").toUpperCase();if(/TXT/.test(t)||String(l.code||"").toUpperCase()==="TXT")t="TXT";else if(/SUB/.test(t)||String(l.code||"").toUpperCase()==="SUB")t="SUB";else if(t!=="P")t="L";
+      o.lines.push({g:String(l.g||""),t,code:t==="TXT"||t==="SUB"?(String(l.code||"").toUpperCase()==="TXT"||String(l.code||"").toUpperCase()==="SUB"?"":String(l.code||"")):String(l.code||""),desc:String(l.desc||""),qty:l.qty?String(l.qty):"",unit:num(l.unit),amt:num(l.amt)})}
+    if(p.totals&&typeof p.totals==="object"&&num(p.totals.total))o.totals=p.totals}
+  return [...m.values()].map(finishInv)}
+function finishInv(o){const ls=o.lines,sum=t=>ls.filter(l=>l.t===t).reduce((a,l)=>a+l.amt,0);
+  const T=o.totals||{},parts=T.parts!=null?num(T.parts):sum("P"),labor=T.labor!=null?num(T.labor):sum("L"),sublet=T.sublet!=null?num(T.sublet):sum("SUB");
+  const exTax=num(T.exTax)||parts+labor+sublet+num(T.surcharge)+num(T.menu),tax=T.tax!=null?num(T.tax):Math.floor(exTax*0.1),total=num(T.total)||exTax+tax;
+  const v={docNo:o.docNo,...Object.fromEntries(HEAD.map(f=>[f,o[f]??""])),billTo:cleanCo(o.billTo),customer:cleanCo(o.customer),mileage:num(o.mileage)||"",
+    lines:ls,parts,labor,sublet,surcharge:num(T.surcharge),menu:num(T.menu),exTax,tax,total};
+  v.summary=invSummary(v);const lineSum=ls.reduce((a,l)=>a+l.amt,0);
+  v._warn=!o.totals?"合計欄が読み取れなかったため、明細から計算しました":Math.abs(lineSum-exTax)>1?`明細の合計（${yen(lineSum)}）と税抜金額が一致しません`:"";
+  return v}
+function renderInvPrev(){const box=$("invPrev");
+  if(!invParsed.length){box.innerHTML="";$("btnInvSave").disabled=true;return}
+  box.innerHTML=`<div class="tbl-wrap"><table class="htbl"><thead><tr><th></th><th>請求書番号</th><th>発行日</th><th>請求先</th><th>登録番号</th><th>シャシNo</th><th>作業内容</th><th class="r">請求金額</th></tr></thead><tbody>`+
+    invParsed.map((v,i)=>{const dup=invoices.has("D"+v.docNo);return `<tr data-i="${i}"><td><input type="checkbox" data-k="on" ${dup?"":"checked"} aria-label="保存する"></td><td class="mono">${esc(v.docNo)}${dup?'<br><span class="st dup">登録済み</span>':""}</td><td class="mono">${esc(ymd(v.issueDate))}</td>`+
+      `<td><input data-k="billTo" value="${esc(v.billTo)}"></td><td><input data-k="plate" value="${esc(v.plate)}"></td><td><input data-k="chassis" value="${esc(v.chassis)}" class="mono"></td><td class="wrap">${esc(v.summary)}${v._warn?`<br><span class="note-err">${esc(v._warn)}</span>`:""}</td><td class="mono r">${yen(v.total)}</td></tr>`}).join("")+`</tbody></table></div>`;
+  $("btnInvSave").disabled=!canWrite}
+$("invPrev").addEventListener("change",e=>{const tr=e.target.closest("tr[data-i]");if(!tr)return;const v=invParsed[+tr.dataset.i],k=e.target.dataset.k;
+  if(k==="on")v._skip=!e.target.checked;else if(k)v[k]=e.target.value.trim()});
+$("btnInvImport").addEventListener("click",async()=>{invParsed=[];renderInvPrev();$("invFile").value="";$("invNote").textContent="";
+  $("invProg").textContent=sampleFn?"":"この画面では読み取り機能が使えません。公開したページを開いてお試しください。";
+  $("invFile").disabled=!sampleFn||!canWrite;$("dlgInv").showModal()});
+let invCtl=null;
+$("invFile").addEventListener("change",async()=>{const files=[...$("invFile").files];if(!files.length||!sampleFn)return;
+  $("invNote").textContent="";invParsed=[];renderInvPrev();invCtl=new AbortController();
+  try{const imgs=await filesToImages(files);if(!imgs.length){$("invProg").textContent="PDFか画像のファイルを選んでください";return}
+    const per=Math.max(1,Math.min(sampleCaps&&sampleCaps.images?sampleCaps.images.maxCount:5,8)),pages=[];
+    for(let i=0;i<imgs.length;i+=per){const chunk=imgs.slice(i,i+per);
+      $("invProg").textContent=`Claudeが読み取り中…（${i+1}〜${Math.min(imgs.length,i+per)}／${imgs.length}ページ）。1回に数十秒かかります`;
+      let res=await sampleFn.json(INV_PROMPT(chunk.length),{images:chunk,signal:invCtl.signal});if(!Array.isArray(res))res=[res];pages.push(...res)}
+    invParsed=mergePages(pages);$("invProg").textContent=`${invParsed.length}件の請求書を読み取りました。内容を確認し、必要なら直してから保存してください。`;renderInvPrev()}
+  catch(e){const c=e&&e.code;$("invProg").textContent="";
+    $("invNote").textContent=c==="not_granted"?"Claudeの利用が許可されていません":c==="rate_limited"?"利用が混み合っています。しばらくしてから試してください":c==="images_unavailable"?"この画面では画像を送れません":c==="invalid_json"?"読み取り結果を整理できませんでした。もう一度ファイルを選んでください":c==="cancelled"?"":e&&e.message==="load"?"PDFを開く部品を読み込めませんでした":"読み取れませんでした。もう一度お試しください"}});
+$("btnInvSave").addEventListener("click",async()=>{const list=invParsed.filter(v=>!v._skip);if(!list.length)return;let n=0;$("btnInvSave").disabled=true;
+  for(const v of list){const {_warn,_skip,...d}=v;d.summary=invSummary(d);d.created=new Date().toISOString();const id="D"+d.docNo;
+    try{if(local||!db){invoices.set(id,{...d,id})}else await db.collection("invoices").doc(id).set(d);n++}catch(e){$("invNote").textContent=errText(e);break}}
+  $("dlgInv").close();renderHist();toast(`${n}件の請求書を保存しました`)});
+$("dlgInv").addEventListener("close",()=>{invCtl&&invCtl.abort()});
+
+/* ---------- バックアップ・復元 ---------- */
+let dlFn=null,isAdmin=true,restoreData=null,restoreArmed=false;
+const stamp=d=>d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes());
+const strip=o=>{const{id,...r}=o;return r};
+function backupObj(){return{app:"作業管理ボード",format:1,exportedAt:new Date().toISOString(),
+  cars:[...cars.values()],loans:[...loans.values()],invoices:[...invoices.values()],settings:JSON.parse(JSON.stringify(settings))}}
+function renderBk(){const lb=settings.lastBackup,el=$("lastBk");
+  if(!lb||!lb.at){el.textContent="まだバックアップはありません";return}const d=new Date(lb.at);
+  el.innerHTML=`最終バックアップ ${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())} <span data-uid="${esc(lb.by||"")}"></span>（カード${lb.cars||0}件・請求書${lb.invoices||0}件）`;fillNames(el)}
+$("btnBackup").addEventListener("click",async()=>{const b=backupObj(),json=JSON.stringify(b,null,1),name=`作業管理ボード_バックアップ_${stamp(new Date())}.json`,note=$("bkNote");note.textContent="";
+  if(!dlFn){$("bkFallback").hidden=false;$("bkText").value=json;note.textContent="この画面ではファイルを保存できません。下の文字をすべてコピーして、メモ帳などに .json で保存してください";return}
+  try{await dlFn.save({filename:name,data:json});
+    try{await patchSettings({lastBackup:{at:b.exportedAt,by:myId||"",cars:b.cars.length,invoices:b.invoices.length}})}catch(e){}
+    toast("バックアップを保存しました")}
+  catch(e){note.textContent=e&&e.code==="declined"?"保存を取り消しました":"保存できませんでした。もう一度お試しください"}});
+$("btnBkCopy").addEventListener("click",async()=>{const t=$("bkText");try{await navigator.clipboard.writeText(t.value);toast("コピーしました")}catch(e){t.select()}});
+$("restoreFile").addEventListener("change",async()=>{const f=$("restoreFile").files[0];restoreData=null;restoreArmed=false;$("btnRestore").textContent="復元を実行";$("bkNote").textContent="";
+  if(!f){renderRestore();return}
+  try{const b=JSON.parse(await f.text());if(b.app!=="作業管理ボード"||!Array.isArray(b.cars))throw 0;restoreData=b}catch(e){$("bkNote").textContent="作業管理ボードのバックアップファイルではありません"}
+  renderRestore()});
+function renderRestore(){const box=$("restorePrev");if(!restoreData){box.hidden=true;return}box.hidden=false;const b=restoreData;
+  const cnt=(arr,map)=>{const ids=(arr||[]).map(x=>x.id).filter(Boolean);return{n:ids.length,over:ids.filter(i=>map.has(i)).length,gone:[...map.keys()].filter(k=>!ids.includes(k)).length}};
+  const c=cnt(b.cars,cars),l=cnt(b.loans,loans),v=cnt(b.invoices,invoices),d=new Date(b.exportedAt);
+  $("rsInfo").innerHTML=`<b>${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}</b> のバックアップ<br>`+
+    `カード ${c.n}件（新規 ${c.n-c.over}・上書き ${c.over}）／代車予定 ${l.n}件（上書き ${l.over}）／請求書 ${v.n}件（上書き ${v.over}）<br>`+
+    `今のボードにだけあるデータ：カード ${c.gone}件・代車予定 ${l.gone}件・請求書 ${v.gone}件`;
+  $("btnRestore").disabled=!canWrite||!isAdmin;$("rsAdmin").hidden=isAdmin}
+$("btnRestore").addEventListener("click",async()=>{const b=restoreData;if(!b||!isAdmin)return;
+  if(!restoreArmed){restoreArmed=true;$("btnRestore").textContent="本当に復元する（元に戻せません）";return}
+  const wipe=$("rsWipe").checked,withSet=$("rsSet").checked,note=$("bkNote");$("btnRestore").disabled=true;restoreArmed=false;
+  const jobs=[];
+  for(const[col,arr,map]of[["cars",b.cars,cars],["loans",b.loans,loans],["invoices",b.invoices,invoices]]){
+    const ids=new Set();for(const x of arr||[]){if(!x||!x.id)continue;ids.add(x.id);jobs.push({col,id:x.id,data:strip(x)})}
+    if(wipe)for(const k of map.keys())if(!ids.has(k))jobs.push({col,id:k,del:true})}
+  let n=0;
+  try{for(const j of jobs){note.textContent=`復元中… ${++n}/${jobs.length}`;
+      if(local||!db){const m=j.col==="cars"?cars:j.col==="loans"?loans:invoices;j.del?m.delete(j.id):m.set(j.id,{...j.data,id:j.id})}
+      else{const ref=db.collection(j.col).doc(j.id);j.del?await ref.delete():await ref.set(j.data)}}
+    if(withSet&&b.settings){const st=strip({...b.settings,id:0});if(local||!db){settings={...DEFSET,...st}}else{await db.doc("settings/main").set(st);settingsExists=true}}
+    note.textContent="";render();toast(`復元しました（${jobs.length}件）`);$("restoreFile").value="";restoreData=null;renderRestore()}
+  catch(e){note.textContent=`${n-1}件まで復元したところで止まりました：${errText(e)}。もう一度実行すると続きから上書きされます`;$("btnRestore").disabled=false;$("btnRestore").textContent="復元を実行"}});
+
+/* ---------- boot ---------- */
+render();setBanner("local");
+(async()=>{const c=window.claude;if(!c||!c.use)return;
+  (async()=>{try{const sf=await c.use("sample");if(!sf)return;const caps=await sf.limits().catch(()=>null);if(caps&&caps.images){sampleFn=sf;sampleCaps=caps}}catch(e){}})();
+  try{db=await c.use("db")}catch(e){db=null}
+  if(!db)return;
+  try{userCap=await c.use("user")}catch(e){userCap=null}
+  if(userCap){try{const w=await userCap.can("data.write");if(w===false)canWrite=false}catch(e){}try{myId=await userCap.id()}catch(e){}try{isAdmin=await userCap.canEdit()}catch(e){isAdmin=false}}
+  try{dlFn=await c.use("downloads")}catch(e){dlFn=null}
+  local=false;setBanner(canWrite?"":"ro");$("btnPaste").disabled=!canWrite;$("btnAdd").disabled=!canWrite;
+  db.collection("cars").onSnapshot(s=>{cars=new Map(s.docs.map(d=>[d.id,{...d.data(),id:d.id}]));render()},()=>setBanner("err"));
+  db.collection("invoices").onSnapshot(s=>{invoices=new Map(s.docs.map(d=>[d.id,{...d.data(),id:d.id}]));if(!$("histView").hidden)renderHist()},()=>{});
+  db.collection("loans").onSnapshot(s=>{loans=new Map(s.docs.map(d=>[d.id,{...d.data(),id:d.id}]));render()},()=>{});
+  db.doc("settings/main").onSnapshot(s=>{settingsExists=s.exists;settings=s.exists?{...DEFSET,...s.data()}:{...DEFSET};render();if($("dlgSet").open){renderAtt();renderBk()}},()=>{})})();
+</script>

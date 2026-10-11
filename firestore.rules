@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ログインしていて、メールアドレスがある人
+    function signedIn() { return request.auth != null && request.auth.token.email != null; }
+    function em() { return request.auth.token.email.lower(); }
+    // 最初の管理者（大木さんのメールアドレス）
+    function isOwner() { return signedIn() && em() == 'OWNER_EMAIL'; }
+    // メンバー表（members）に入っている人
+    function isMember() { return signedIn() && (isOwner() || exists(/databases/$(database)/documents/members/$(em()))); }
+    function isAdmin() { return isOwner() || (isMember() && get(/databases/$(database)/documents/members/$(em())).data.admin == true); }
+
+    match /members/{email} {
+      allow read: if isMember() || (signedIn() && email == em());
+      allow write: if isAdmin();
+    }
+    match /cars/{id}     { allow read, write: if isMember(); }
+    match /loans/{id}    { allow read, write: if isMember(); }
+    match /settings/{id} { allow read, write: if isMember(); }
+  }
+}
