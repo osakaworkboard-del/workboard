@@ -506,15 +506,18 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 
 <script>
 const STATES=[["入庫待ち","--s0"],["入庫済み","--s1"],["作業待ち","--s2"],["作業中","--s3"],["合意待ち","--s4"],["部品待ち","--s5"],["完成","--s6"]];
-const KUBUN=["3か月点検","3か月点検＋Sメンテ","3か月点検＋Mメンテ","3か月点検＋Lメンテ","車検","車検＋Sメンテ","車検＋Mメンテ","車検＋Lメンテ","Sメンテ","Mメンテ","Lメンテ","一般","新車","板金"];
+const KUBUN=["3か月点検","3か月点検＋Sメンテ","3か月点検＋Mメンテ","3か月点検＋Lメンテ","車検","車検＋Sメンテ","車検＋Mメンテ","車検＋Lメンテ","Sメンテ","Mメンテ","Lメンテ","Rメンテ","Rメンテ（DC16）","一般","新車","板金"];
 const TECHS=["栢原","木村","浅井","佐藤","北畠","上田","林","ドック","スプリヤント","カリム","ケサブ"];
 const LOANERS=["7187","2088","3986","レンタカー"];
 /* 標準工数（h）：2026スカニアM含む(AL基準)・法令点検。並びは VTYPES の順 */
 const VTYPES=["トラクタ4×2","トラクタ6×4","トラック6×2","トラック6×4"];
 const STD={"3か月点検":[1.8,1.9,1.9,1.9],"3か月点検＋Sメンテ":[3.6,4.5,3.7,3.9],"3か月点検＋Mメンテ":[5.4,6.1,5.5,5.7],"3か月点検＋Lメンテ":[8.5,9.9,8.5,9.0],
   "車検":[7.6,8.1,8.1,8.1],"車検＋Sメンテ":[8.9,10.2,9.4,9.6],"車検＋Mメンテ":[10.5,11.6,11.0,11.2],"車検＋Lメンテ":[13.5,15.3,13.9,14.4],
-  "Sメンテ":[2.5,3.3,2.5,2.7],"Mメンテ":[4.4,5.0,4.4,4.6],"Lメンテ":[7.8,9.1,7.7,8.2]};
-const stdH=c=>{const r=STD[c.kubun];if(!r)return 0;return r[Math.max(0,VTYPES.indexOf(c.vtype))]};
+  "Sメンテ":[2.5,3.3,2.5,2.7],"Mメンテ":[4.4,5.0,4.4,4.6],"Lメンテ":[7.8,9.1,7.7,8.2],
+  /* Rメンテ：DC13 4×2トラクタ2.7・DC13 6×4トラクタ4.0・DC13 6×2リジッド3.1／DC16 6×4トラクタ3.2。null＝標準工数なし（工数を手で入れる） */
+  "Rメンテ":[2.7,4.0,3.1,null],"Rメンテ（DC16）":[null,3.2,null,null]};
+const stdH=c=>{const r=STD[c.kubun];if(!r)return 0;return +r[Math.max(0,VTYPES.indexOf(c.vtype))]||0};
+const hasStd=c=>{const r=STD[c.kubun];return !!r&&r[Math.max(0,VTYPES.indexOf(c.vtype))]!=null};
 const totalH=c=>stdH(c)+(+c.extraH||0);
 const fmt=n=>String(Math.round((+n||0)*10)/10);
 const inLabel=c=>c.inDate?`入庫 ${md(c.inDate)}${c.inTime?" "+c.inTime:""}`:"入庫 未定";
@@ -736,9 +739,9 @@ function updLoan(keep){const sel=$("f_loanerCar"),val=keep!=null?keep:sel.value;
   info.innerHTML=`貸出期間 ${md(p.from)}〜${md(p.to)}${$("f_loanFrom").value||$("f_loanTo").value?"":"（入庫日〜出庫日）"}`+(cl.length?`　<span class="over">${esc(val)}はこの期間に予定があります</span>`:"")}
 ["f_loanerCar","f_loanFrom","f_loanTo","f_inDate","f_outDate"].forEach(k=>$(k).addEventListener("change",()=>{if(!$("loanerCarFld").hidden)updLoan()}));
 function updH(){const o={kubun:$("f_kubun").value,vtype:$("f_vtype").value,extraH:Math.max(0,parseFloat($("f_extraH").value)||0)};
-  const s=stdH(o),has=!!STD[o.kubun];$("extraLbl").textContent=has?"追加工数（h）":"工数（h）";
+  const s=stdH(o),has=hasStd(o);$("extraLbl").textContent=has?"追加工数（h）":"工数（h）";
   let h=has?`標準 <b>${fmt(s)}</b>h${o.vtype?"":"（車型未選択のためトラクタ4×2で計算）"} ＋ 追加 <b>${fmt(o.extraH)}</b>h ＝ 合計 <b>${fmt(s+o.extraH)}</b>h`
-    :o.kubun?`${esc(o.kubun)}は標準工数がありません。工数を入力してください。合計 <b>${fmt(o.extraH)}</b>h`:"区分を選ぶと標準工数が入ります";
+    :o.kubun?`${esc(o.kubun)}${STD[o.kubun]?`（${esc(o.vtype||"車型未選択")}）`:""}は標準工数がありません。工数を入力してください。合計 <b>${fmt(o.extraH)}</b>h`:"区分を選ぶと標準工数が入ります";
   const d=$("f_inDate").value;
   if(d){const cap=capOn(d),L=dayLoad(d,editing),after=L.h+s+o.extraH;
     if(!cap)h+=`<br><span class="over">${md(d)}はキャパ0hの日です（休み）</span>`;
