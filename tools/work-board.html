@@ -70,7 +70,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .card.k-new{background:var(--kn-bg);border-color:var(--kn-bd)} .k-new .kubun{color:var(--kn-ink);border-color:var(--kn-bd);background:var(--surface)}
 .card.k-ban{background:var(--kb-bg);border-color:var(--kb-bd)} .k-ban .kubun{color:var(--kb-ink);border-color:var(--kb-bd);background:var(--surface)}
 .card.k-mnt{background:var(--km-bg);border-color:var(--km-bd)} .k-mnt .kubun{color:var(--km-ink);border-color:var(--km-bd);background:var(--surface)}
-.wip{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.wip{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.card .c-top{flex-wrap:nowrap;gap:4px}
+.card .c-top .wip{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.c-top .outd{margin-left:auto;flex:0 0 auto;font-family:var(--f-mono);font-size:11px;letter-spacing:-.02em;font-weight:600;color:var(--muted);white-space:nowrap}
+.c-top .outd.today{color:var(--warn)}
+.c-top .outd.late{color:var(--bad)}
 .plate{font-size:14.5px;font-weight:700;overflow-wrap:anywhere;line-height:1.4}
 .plate .sep{color:var(--muted);font-weight:400;margin:0 3px}
 .c-foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
@@ -683,7 +688,9 @@ function cardHTML(c,t){
     c.state==="部品待ち"&&c.partsDate?`<span class="tag parts">部品 ${esc(md(c.partsDate))}入荷</span>`:"",
     c.shipped?`<span class="tag">出庫済</span>`:""].join("");
   const fam=famOf(c.kubun);
-  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
+  const outCls=done||c.shipped||!c.outDate?"":c.outDate<t?"late":c.outDate===t?"today":"";
+  const outL=c.outDate?`納車${md(c.outDate)}${c.outTime?" "+esc(c.outTime):""}`:"納車 未定";
+  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span><span class="outd ${outCls}" title="納車（出庫）予定">${outL}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
 
 const board=$("board");
 board.addEventListener("click",e=>{const c=e.target.closest(".card");if(c)openCar(c.dataset.id)});
