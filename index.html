@@ -9,7 +9,7 @@
   --bg:#eceff3; --surface:#ffffff; --sunk:#f5f7f9; --ink:#17212b; --muted:#5b6876; --line:#d2d8df;
   --accent:#1c4d8c; --accent-ink:#ffffff;
   --warn:#b86e00; --warn-bg:#fff3df; --bad:#b9322a; --bad-bg:#fde9e7; --ok:#2c7a4b; --ok-bg:#e4f4ea;
-  --s0:#8a6d3b; --s1:#6b7a89; --s2:#2f6fbf; --s3:#1f8a7a; --s4:#c47f00; --s5:#7b5bb5; --s6:#2c7a4b;
+  --s0:#8a6d3b; --s1:#6b7a89; --s2:#2f6fbf; --s3:#1f8a7a; --s4:#c47f00; --s5:#7b5bb5; --s6:#2c7a4b; --s7:#b0457a;
   --f-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
   --r:6px;
@@ -18,12 +18,12 @@
   --bg:#10151b; --surface:#19212a; --sunk:#141b22; --ink:#e5eaf0; --muted:#94a2b0; --line:#2c3844;
   --accent:#78a6e6; --accent-ink:#0d1620;
   --warn:#f0a83c; --warn-bg:#3a2a10; --bad:#f06c60; --bad-bg:#3d1b18; --ok:#5ec18b; --ok-bg:#16301f;
-  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; color-scheme:dark}}
+  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; --s7:#e07aa8; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#10151b; --surface:#19212a; --sunk:#141b22; --ink:#e5eaf0; --muted:#94a2b0; --line:#2c3844;
   --accent:#78a6e6; --accent-ink:#0d1620;
   --warn:#f0a83c; --warn-bg:#3a2a10; --bad:#f06c60; --bad-bg:#3d1b18; --ok:#5ec18b; --ok-bg:#16301f;
-  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; color-scheme:dark}
+  --s0:#c8a46a; --s1:#8e9cab; --s2:#5f97e0; --s3:#46b7a4; --s4:#e3a33a; --s5:#a588dc; --s6:#5ec18b; --s7:#e07aa8; color-scheme:dark}
 /* 区分の色：3か月点検系=青 / 車検系=赤 / 新車=黄 / 板金=ピンク / メンテ単独=緑 / 一般=白 */
 :root{--kt-bg:#e4eefb;--kt-bd:#9dbde8;--kt-ink:#1c4d8c;--ks-bg:#fce7e5;--ks-bd:#eba59d;--ks-ink:#b0302a;--kn-bg:#fff5c7;--kn-bd:#e2c443;--kn-ink:#7d6100;--kb-bg:#fde8f2;--kb-bd:#eda4c6;--kb-ink:#a8306a;--km-bg:#e3f3e9;--km-bd:#93c9a6;--km-ink:#2c7a4b}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--kt-bg:#17283d;--kt-bd:#2f5383;--kt-ink:#8fb8ef;--ks-bg:#371a19;--ks-bd:#7a3530;--ks-ink:#f28a80;--kn-bg:#332b0e;--kn-bd:#7a6720;--kn-ink:#ecd067;--kb-bg:#381a2a;--kb-bd:#7c3559;--kb-ink:#f19ac3;--km-bg:#16301f;--km-bd:#2f6844;--km-ink:#6fcf98}}
@@ -653,7 +653,7 @@ $("memAdd").addEventListener("click",async()=>{const em=$("memEmail").value.trim
 
 <script>
 const stVar=c=>{if(c.shipped)return"var(--muted)";const s=STATES.find(x=>x[0]===c.state);return s?`var(${s[1]})`:"var(--line)"};
-const STATES=[["入庫待ち","--s0"],["入庫済み","--s1"],["作業待ち","--s2"],["作業中","--s3"],["合意待ち","--s4"],["部品待ち","--s5"],["完成","--s6"]];
+const STATES=[["入庫待ち","--s0"],["入庫済み","--s1"],["作業待ち","--s2"],["作業中","--s3"],["合意待ち","--s4"],["部品待ち","--s5"],["検査待ち","--s7"],["完成","--s6"]];
 const KUBUN=["3か月点検","3か月点検＋Sメンテ","3か月点検＋Mメンテ","3か月点検＋Lメンテ","車検","車検＋Sメンテ","車検＋Mメンテ","車検＋Lメンテ","Sメンテ","Mメンテ","Lメンテ","Rメンテ","Rメンテ（DC16）","一般","新車","板金"];
 const TECHS=["栢原","木村","浅井","佐藤","北畠","上田","林","ドック","スプリヤント","カリム","ケサブ"];
 const LOANERS=["7187","2088","3986","レンタカー"];
