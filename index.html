@@ -87,6 +87,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .due.late{background:var(--bad-bg);color:var(--bad);font-weight:600}
 .tag{font-size:11.5px;color:var(--muted)}
 .tag.parts{color:var(--s5)}
+/* 長期：入庫日から5日以上たっている車両。赤でゆっくり点滅 */
+.tag.long{color:#fff;background:var(--bad);font-weight:700;padding:1px 7px;border-radius:4px;animation:longBlink 2.4s ease-in-out infinite}
+@keyframes longBlink{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.tag.long{animation:none}}
+.card.long{box-shadow:inset 0 0 0 2px var(--bad)}
 .tag.loan.on{color:var(--ink);font-weight:700}
 .req .lbl{font-size:11px;font-weight:700;color:var(--muted);margin-right:6px}
 .req .none{color:var(--muted)}
@@ -673,6 +678,10 @@ const stdH=c=>{const r=STD[c.kubun];if(!r)return 0;return +r[Math.max(0,VTYPES.i
 const hasStd=c=>{const r=STD[c.kubun];return !!r&&r[Math.max(0,VTYPES.indexOf(c.vtype))]!=null};
 const totalH=c=>stdH(c)+(+c.extraH||0);
 const fmt=n=>String(Math.round((+n||0)*10)/10);
+const LONG_DAYS=5;
+/* 入庫日から何日目か（入庫日＝1日目ではなく、経過日数）。工場にいる車両（入庫待ち・完成・出庫済み以外）だけ */
+const longDays=c=>{if(!c.inDate||c.shipped||(c.state||"")==="入庫待ち"||c.state==="完成")return 0;
+  const d=Math.floor((new Date(todayISO()+"T00:00")-new Date(c.inDate+"T00:00"))/864e5);return d>=LONG_DAYS?d:0};
 const inLabel=c=>c.inDate?`入庫 ${md(c.inDate)}${c.inTime?" "+c.inTime:""}`:"入庫 未定";
 const DEFSET={limit:60,dayStart:"9:00",lunchFrom:"12:00",lunchTo:"13:00",techs:TECHS.map(n=>({name:n,hours:8,from:""})),absence:{},holidays:[]};
 let settings={...DEFSET};
@@ -810,6 +819,7 @@ function render(){
   $("summary").innerHTML=`<span class="chip">入庫待ち <b>${active.filter(c=>c.state==="入庫待ち").length}</b>台</span><span class="chip">入庫 <b>${active.filter(c=>c.state!=="入庫待ち").length}</b>台</span>`+
     (dueToday?`<span class="chip warn">本日出庫予定 <b>${dueToday}</b>台</span>`:"")+
     (late?`<span class="chip bad">出庫日超過 <b>${late}</b>台</span>`:"")+
+    (()=>{const n=active.filter(c=>longDays(c)).length;return n?`<span class="chip bad">長期（${LONG_DAYS}日以上） <b>${n}</b>台</span>`:""})()+
     `<span class="chip">完成 <b>${active.filter(c=>c.state==="完成").length}</b>台</span>`+
     (()=>{const s=loanStatusToday();return `<span class="chip${s.free?"":" warn"}">代車 空き <b>${s.free}</b>台／貸出中 <b>${s.busy}</b>台</span>`})();
   const list=all.filter(c=>(showS||!c.shipped)&&(!q||[c.plate,c.customer,c.wip,c.tech].join(" ").toLowerCase().includes(q)));
@@ -826,13 +836,14 @@ function cardHTML(c,t){
   const l2=`<div class="req"><span class="lbl">用命</span>${c.request?esc(c.request):'<span class="none">未入力</span>'}</div>`+
     `<div class="c-foot"><span class="due ${inCls}">${esc(inLabel(c))}</span>`+
     `<span class="tag loan${c.loaner?" on":""}">代車 ${c.loaner?esc(c.loanerCar||"あり"):"無し"}</span></div>`;
-  const foot=[totalH(c)?`<span class="tag">工数 ${fmt(totalH(c))}h</span>`:"",c.tech?`<span class="tag">担当 ${esc(c.tech)}</span>`:"",
+  const ld=longDays(c);
+  const foot=[ld?`<span class="tag long" title="入庫日から${ld}日たっています">長期 ${ld}日</span>`:"",totalH(c)?`<span class="tag">工数 ${fmt(totalH(c))}h</span>`:"",c.tech?`<span class="tag">担当 ${esc(c.tech)}</span>`:"",
     c.state==="部品待ち"&&c.partsDate?`<span class="tag parts">部品 ${esc(md(c.partsDate))}入荷</span>`:"",
     c.shipped?`<span class="tag">出庫済</span>`:""].join("");
   const fam=famOf(c.kubun);
   const outCls=done||c.shipped||!c.outDate?"":c.outDate<t?"late":c.outDate===t?"today":"";
   const outL=c.outDate?`納車${md(c.outDate)}${c.outTime?" "+esc(c.outTime):""}`:"納車 未定";
-  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span><span class="outd ${outCls}" title="納車（出庫）予定">${outL}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
+  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}${ld?" long":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span><span class="outd ${outCls}" title="納車（出庫）予定">${outL}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
 
 const board=$("board");
 board.addEventListener("click",e=>{const c=e.target.closest(".card");if(c)openCar(c.dataset.id)});
