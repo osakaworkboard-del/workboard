@@ -859,7 +859,7 @@ async function writeCar(id,data,create){
 async function removeCar(id){if(local||!db){cars.delete(id);render();return}await db.collection("cars").doc(id).delete()}
 
 /* ---------- board ---------- */
-function render(){
+function render(){resvCache=null;
   const t=todayISO(),q=$("q").value.trim().toLowerCase(),showS=$("showShipped").checked;
   $("today").textContent=t.replace(/-/g,"/");
   const all=[...cars.values()];
@@ -1165,16 +1165,23 @@ $("tabHist").addEventListener("click",()=>showTab("h"));
 let rDay=todayISO(),rDrag=null,resvPend=null;
 const WD="日月火水木金土";
 /* その日に、予約上限（キャパ×上限%）まであと何時間入れられるか */
-function resvRoom(d){const cap=capOn(d);if(!cap)return{cap:0,lim:0,used:0,rem:0,lv:"off"};
-  const lim=cap*settings.limit/100,used=dayLoad(d).h,rem=lim-used;
-  return{cap,lim,used,rem,lv:rem<=0?"over":rem<Math.min(4,lim*0.25)?"warn":"ok"}}
+/* その日に入っている作業時間＝担当済みで時間軸に載っている分（個人ボードと同じ計算）＋未割当の作業 */
+let resvCache=null;
+function dayUsed(d){if(!resvCache)resvCache={flows:null,days:new Map()};const C=resvCache;if(C.days.has(d))return C.days.get(d);
+  if(!C.flows){const all=liveSegs();C.flows=(settings.techs||[]).map(t=>flowTech(t,all))}
+  let a=0;for(const f of C.flows)for(const p of(f.get(d)||[]))a+=(p.end-p.start-lunchOverlap(p.start,p.end))/60;
+  const u=[...cars.values()].filter(c=>!c.shipped&&onDay(c,d)).flatMap(segsOf).filter(s=>!s.tech).reduce((x,s)=>x+s.h,0);
+  const r={a,u,h:a+u};C.days.set(d,r);return r}
+function resvRoom(d){const cap=capOn(d);if(!cap)return{cap:0,lim:0,used:0,rem:0,lv:"off",a:0,u:0};
+  const lim=cap*settings.limit/100,du=dayUsed(d),used=du.h,rem=lim-used;
+  return{cap,lim,used,rem,a:du.a,u:du.u,lv:rem<=0?"over":rem<Math.min(4,lim*0.25)?"warn":"ok"}}
 /* 予約できる残り時間の表示（予約ページと月間の日別で共通） */
 function resvCapHTML(d){const r=resvRoom(d);
   if(r.lv==="off")return{cls:"rv-cap",html:`<span class="big">${md(d)}は休業日です</span><span class="sub">ほかの日をご案内ください</span>`};
   const alt=[];for(let i=1;i<=21&&alt.length<3;i++){const x=addDays(d,i),q=resvRoom(x);if(q.lv==="ok")alt.push(x)}
   return{cls:"rv-cap "+r.lv,html:(r.rem>0?`<span class="big">あと <b>${fmt(r.rem)}</b> h 予約できます</span>`:`<span class="big">予約上限に達しています</span>`)+
-    `<span class="rv-bar" title="予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h／キャパ ${fmt(r.cap)}h"><i style="width:${Math.min(100,r.used/r.cap*100)}%"></i><u style="left:${settings.limit}%"></u></span>`+
-    `<span class="sub">予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h（キャパ ${fmt(r.cap)}h の ${settings.limit}%）</span>`+
+    `<span class="rv-bar" title="予定 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h／キャパ ${fmt(r.cap)}h"><i style="width:${Math.min(100,r.used/r.cap*100)}%"></i><u style="left:${settings.limit}%"></u></span>`+
+    `<span class="sub">予定 ${fmt(r.used)}h（担当済み ${fmt(r.a)}h＋未割当 ${fmt(r.u)}h）／上限 ${fmt(r.lim)}h（キャパ ${fmt(r.cap)}h の ${settings.limit}%）</span>`+
     (r.lv!=="ok"&&alt.length?`<span class="rv-alt">空きのある日：${alt.map(x=>`<button class="btn" type="button" data-go="${x}">${md(x)}（${WD[new Date(x+"T00:00").getDay()]}）残${fmt(resvRoom(x).rem)}h</button>`).join("")}</span>`:"")}}
 const addDays=(d,n)=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+n);return isoOf(x.getFullYear(),x.getMonth(),x.getDate())};
 function renderResv(){const t=todayISO(),d=rDay,dt=new Date(d+"T00:00");
@@ -1185,7 +1192,7 @@ function renderResv(){const t=todayISO(),d=rDay,dt=new Date(d+"T00:00");
     ["月","火","水","木","金","土","日"].map((w,i)=>`<div class="rv-wd${i===5?" sat":i===6?" sun":""}">${w}</div>`).join("");
   for(let i=0;i<14;i++){const x=addDays(start,i),r=resvRoom(x),past=x<t;
     const bar=r.lv==="off"?"":`<span class="dbar"><i style="width:${Math.min(100,r.lim?r.used/r.lim*100:0)}%"></i></span>`;
-    days+=`<button type="button" class="rv-d ${r.lv}${x===t?" today":""}${past?" past":""}" data-d="${x}" aria-pressed="${x===d}" title="${md(x)} 予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h"><span class="dd"><small>${+x.slice(5,7)}/</small>${+x.slice(8)}</span>${bar}<span class="dr">${r.lv==="off"?"休み":r.rem>0?"残 "+fmt(r.rem)+"h":"満"}</span></button>`}
+    days+=`<button type="button" class="rv-d ${r.lv}${x===t?" today":""}${past?" past":""}" data-d="${x}" aria-pressed="${x===d}" title="${md(x)} 予定 ${fmt(r.used)}h（担当済み ${fmt(r.a)}h＋未割当 ${fmt(r.u)}h）／上限 ${fmt(r.lim)}h"><span class="dd"><small>${+x.slice(5,7)}/</small>${+x.slice(8)}</span>${bar}<span class="dr">${r.lv==="off"?"休み":r.rem>0?"残 "+fmt(r.rem)+"h":"満"}</span></button>`}
   $("rDays").innerHTML=days+"</div>";
   const cap=$("rCap"),bh=resvCapHTML(d);cap.className=bh.cls;cap.innerHTML=bh.html;
   $("rTl").innerHTML=dayTimeline(d,true)||`<p class="hint">この日は時間軸がありません（休業日、またはテクニシャン未登録）</p>`}
