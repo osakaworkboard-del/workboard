@@ -174,6 +174,13 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .rv-bar i{position:absolute;top:0;bottom:0;left:0;background:var(--accent)}
 .rv-bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--bad)}
 .rv-alt{font-size:13px} .rv-alt button{margin-left:6px}
+.mg-g{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+.mg-g .src{font-weight:700} .mg-g .src .mono{font-weight:400;color:var(--muted)}
+.mg-o{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.mg-o:hover{background:var(--sunk)} .mg-o input{margin-top:3px}
+.mg-o .why{font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;background:var(--ok-bg);color:var(--ok);margin-left:6px}
+.mg-o .why.weak{background:var(--warn-bg);color:var(--warn)}
+.mg-o small{display:block;color:var(--muted);font-size:12px}
 .rv-cand{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13px}
 .rv-cand .lb{font-weight:700;margin-right:4px}
 .rv-cand button{display:inline-flex;flex-direction:column;align-items:center;gap:1px;padding:5px 12px;border-radius:8px;border:1px solid var(--ok);background:var(--ok-bg);color:var(--ink);cursor:pointer;font:inherit}
@@ -605,6 +612,15 @@ $("memAdd").addEventListener("click",async()=>{const em=$("memEmail").value.trim
 </main>
 
 
+<dialog id="dlgMerge">
+  <div class="d-h"><h3>同じ車両のカードがあるかもしれません</h3></div>
+  <div class="d-b">
+    <p class="hint" id="mgIntro"></p>
+    <div id="mgList"></div>
+    <p class="hint">合成すると1枚のカードにまとめます。顧客名・登録番号・WIP番号は<b>DMS取込</b>の内容を、入庫日時・出庫（納車）日時・代車の予約・区分・工数・用命は<b>1台追加（予約）</b>のカードの内容を使います。片方が空の項目は、もう片方の内容で埋めます。</p>
+  </div>
+  <div class="d-f"><span class="sp"></span><button class="btn" type="button" id="mgCancel">戻る</button><button class="btn primary" type="button" id="mgOk">この内容で進める</button></div>
+</dialog>
 <dialog id="dlgPaste">
   <div class="d-h"><h3>DMSから貼り付け</h3><button class="btn x" type="button" data-close>閉じる</button></div>
   <div class="d-b">
@@ -849,13 +865,53 @@ function renderPreview(){
   $("pasteNote").textContent=`作成 ${ok}台`+(dup?`・登録済み ${dup}台（作成しません）`:"")+(bad?`・読めない行 ${bad}`:"");
   $("btnCreate").disabled=!ok||!canWrite;$("btnCreate").textContent=ok?`${ok}台のカードを作成`:"カードを作成"}
 
+/* ---------- 1台追加（予約）のカードと、DMS取込のカードの重複チェック・合成 ---------- */
+const corpStrip=s=>nrm(s).replace(/株式会社|有限会社|合同会社|合資会社|\(株\)|\(有\)|㈱|㈲|御中/g,"");
+const plateKey=s=>nrm(s).replace(/[^\p{L}\p{N}]/gu,"");
+/* 一部一致：登録番号（3文字以上で片方がもう片方を含む／末尾の番号が同じ）→強い、顧客名（2文字以上で片方が含む）→弱い */
+function matchKind(a,b){const pa=plateKey(a.plate),pb=plateKey(b.plate);
+  if(pa&&pb){const ta=(pa.match(/(\d+)$/)||[])[1]||"",tb=(pb.match(/(\d+)$/)||[])[1]||"";
+    if((Math.min(pa.length,pb.length)>=3&&(pa.includes(pb)||pb.includes(pa)))||(ta.length>=3&&ta===tb))return"plate"}
+  const ca=corpStrip(a.customer),cb=corpStrip(b.customer);
+  if(ca&&cb&&Math.min(ca.length,cb.length)>=2&&(ca.includes(cb)||cb.includes(ca)))return"customer";return""}
+const MAN_KEYS=["inDate","inTime","outDate","outTime","loaner","loanerCar","loanFrom","loanTo","kubun","vtype","extraH","request","segs","tech","contact","partsDate"];
+const filled=v=>Array.isArray(v)?v.some(x=>x&&typeof x==="object"?(x.tech||x.at!=null||x.fix||x.h):x):v!==undefined&&v!==null&&v!==""&&v!==false&&v!==0;
+/* 合成の内容：man＝1台追加（予約）、dms＝DMS取込。顧客名・登録番号・WIPはDMS優先、日時・代車・区分・工数・用命などは1台追加優先 */
+function mergeData(man,dms){const o={};
+  for(const k of MAN_KEYS)o[k]=filled(man[k])?man[k]:dms[k];
+  for(const k of["customer","plate","wip"])o[k]=filled(dms[k])?dms[k]:man[k];
+  return o}
+const carLine=c=>`${esc(c.customer||"（顧客名なし）")}｜${esc(c.plate||"（登録番号なし）")}`;
+const carSub=c=>[c.wip?"WIP "+esc(c.wip):"WIPなし",c.inDate?"入庫 "+md(c.inDate)+(c.inTime?" "+esc(c.inTime):""):"",c.outDate?"納車 "+md(c.outDate)+(c.outTime?" "+esc(c.outTime):""):"",c.kubun?esc(c.kubun):"",c.request?"用命 "+esc(c.request):"",c.loaner?"代車 "+esc(c.loanerCar||"あり"):""].filter(Boolean).join("・");
+/* 確認ポップアップ。groups=[{src, cands:[{id,c,kind}]}] → 選んだID（合成しない＝""）の配列。戻る＝null */
+function askMerge(intro,groups){return new Promise(res=>{
+  $("mgIntro").textContent=intro;
+  $("mgList").innerHTML=groups.map((g,gi)=>`<div class="mg-g"><div class="src">${g.src}</div>`+
+    g.cands.map((x,ci)=>`<label class="mg-o"><input type="radio" name="mg${gi}" value="${esc(x.id)}" ${ci===0&&x.kind==="plate"?"checked":""}><span>合成する：${carLine(x.c)}<span class="why${x.kind==="plate"?"":" weak"}">${x.kind==="plate"?"登録番号が一致":"顧客名が一致"}</span><small>${carSub(x.c)}</small></span></label>`).join("")+
+    `<label class="mg-o"><input type="radio" name="mg${gi}" value="" ${g.cands[0].kind==="plate"?"":"checked"}><span>合成しない（別の車両として扱う）</span></label></div>`).join("");
+  const d=$("dlgMerge");let done=false;
+  const fin=v=>{if(done)return;done=true;d.close();res(v)};
+  $("mgOk").onclick=()=>fin(groups.map((g,gi)=>{const r=d.querySelector(`input[name="mg${gi}"]:checked`);return r?r.value:""}));
+  $("mgCancel").onclick=()=>fin(null);d.onclose=()=>fin(null);d.showModal()})}
+const mgLog=txt=>({["l"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)]:{at:new Date().toISOString(),text:txt,by:myId||""}});
+
 async function createFromPaste(){
   const rows=parsed.filter(r=>r.status==="ok"||r.status==="nowip");if(!rows.length)return;
-  $("btnCreate").disabled=true;let n=0;
+  /* DMSの行ごとに、WIPなし（1台追加・予約）のカードで似ているものを探す */
+  const mans=[...cars.values()].filter(c=>!c.wip&&!c.shipped),used=new Set(),groups=[],gRow=[];
+  rows.forEach((r,i)=>{const cands=mans.map(c=>({id:c.id,c,kind:matchKind(c,r)})).filter(x=>x.kind).sort((a,b)=>(a.kind==="plate"?0:1)-(b.kind==="plate"?0:1));
+    if(cands.length){groups.push({src:`DMS取込：${carLine(r)}<span class="mono">　WIP ${esc(r.wip||"なし")}${r.inDate?"・入庫 "+md(r.inDate)+(r.inTime?" "+esc(r.inTime):""):""}</span>`,cands});gRow.push(i)}});
+  let pick=[];
+  if(groups.length){pick=await askMerge(`DMSから取り込む ${rows.length}台のうち ${groups.length}台は、1台追加（予約）で作ったカードと似ています。同じ車両なら「合成する」を選んでください。`,groups);if(pick===null)return}
+  const mergeTo=new Map();gRow.forEach((ri,gi)=>{const id=pick[gi];if(id&&!used.has(id)){mergeTo.set(ri,id);used.add(id)}});
+  $("btnCreate").disabled=true;let n=0,m=0;
   for(const [i,r] of rows.entries()){const {status,...data}=r;
+    if(mergeTo.has(i)){const man=cars.get(mergeTo.get(i));if(man){
+      try{const md0=mergeData(man,data),patch={};for(const k of Object.keys(md0))if(JSON.stringify(md0[k])!==JSON.stringify(man[k]))patch[k]=md0[k];
+        await writeCar(man.id,{...patch,logs:mgLog(`DMS取込と合成（WIP ${data.wip||"なし"}）`)});m++}catch(e){toast(errText(e));break}continue}}
     try{await writeCar(docId(r.wip)||("M"+Date.now().toString(36)+i),{...data,state:"入庫待ち",vtype:"",extraH:0,kubun:"",tech:"",request:"",contact:"",partsDate:"",loaner:false,shipped:false,log:[],created:new Date().toISOString()},true);n++}
     catch(e){toast(errText(e));break}}
-  $("dlgPaste").close();$("pasteBox").value="";renderPreview();toast(`${n}台のカードを作成しました`)}
+  $("dlgPaste").close();$("pasteBox").value="";renderPreview();toast(`${n}台のカードを作成しました`+(m?`・${m}台は既存のカードと合成しました`:""))}
 
 /* ---------- storage ---------- */
 function errText(e){const c=e&&e.code;return c==="quota_exceeded"?"保存できる件数の上限です。出庫済のカードを削除してください。":c==="invalid_argument"?"変更する権限がありません。":"保存できませんでした。もう一度お試しください。"}
@@ -1003,6 +1059,11 @@ $("btnSave").addEventListener("click",async()=>{const o=formData(),note=$("carNo
       await writeCar(editing,patch);
       if(moved){$("dlgCar").close();toast("ほかの人の変更はそのまま残し、あなたが変えた項目だけ保存しました");return}}
     else{if(o.wip&&(cars.has(docId(o.wip))||hasWip(o.wip))){note.textContent="このWIP番号のカードは既にあります";return}
+      if(!o.wip){const cands=[...cars.values()].filter(c=>c.wip&&!c.shipped).map(c=>({id:c.id,c,kind:matchKind(c,o)})).filter(x=>x.kind).sort((a,b)=>(a.kind==="plate"?0:1)-(b.kind==="plate"?0:1)).slice(0,5);
+        if(cands.length){const pk=await askMerge("DMSから取り込んだカードに、似ている車両があります。同じ車両なら「合成する」を選んでください。",[{src:`1台追加：${carLine(o)}<span class="mono">　${carSub(o)}</span>`,cands}]);
+          if(pk===null)return;
+          if(pk[0]){const dms=cars.get(pk[0]),md0=mergeData(o,dms),patch={};for(const k of Object.keys(md0))if(JSON.stringify(md0[k])!==JSON.stringify(dms[k]))patch[k]=md0[k];
+            await writeCar(dms.id,{...patch,logs:mgLog("1台追加（予約）の内容と合成")});$("dlgCar").close();toast("既存のカードと合成しました");return}}}
       const id=docId(o.wip)||("M"+Date.now().toString(36));
       await writeCar(id,{...o,shipped:false,log:[],created:new Date().toISOString()},true)}
     $("dlgCar").close();toast("保存しました")}catch(e){note.textContent=errText(e)}});
