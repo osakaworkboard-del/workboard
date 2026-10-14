@@ -168,7 +168,7 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .rv-bar i{position:absolute;top:0;bottom:0;left:0;background:var(--accent)}
 .rv-bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--bad)}
 .rv-alt{font-size:13px} .rv-alt button{margin-left:6px}
-#rTl .dtl-r[data-tech]{cursor:crosshair}
+#rTl .dtl-r[data-tech],#dayPanel .dtl-r[data-tech]{cursor:crosshair}
 .rv-sel{position:absolute;top:2px;bottom:2px;border-radius:6px;background:color-mix(in srgb,var(--accent) 22%,transparent);border:2px solid var(--accent);z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:visible}
 .rv-sel.over{background:color-mix(in srgb,var(--bad) 22%,transparent);border-color:var(--bad)}
 .rv-sel span{background:var(--surface);padding:0 6px;border-radius:4px;border:1px solid currentColor}
@@ -949,7 +949,10 @@ function renderDay(){const p=$("dayPanel");if(!selDay){p.hidden=true;return}p.hi
   const rows=L.cars.sort((a,b)=>sIdx(a)-sIdx(b)||totalH(b)-totalH(a)).map(c=>`<tr data-id="${esc(c.id)}" style="--sc:${stVar(c)}"><td>${esc(c.customer||"—")}｜${esc(c.plate||"—")}</td><td>${esc(c.kubun||"未選択")}</td><td>${esc(c.vtype||"—")}</td><td class="mono">${fmt(totalH(c))}h</td><td><span class="stp">${esc(c.shipped?"出庫済":(c.state||""))}</span></td></tr>`).join("");
   p.innerHTML=`<div class="dayp-h"><h3>${md(selDay)}（${"日月火水木金土"[dt.getDay()]}）</h3><span class="hint">${cap?`予約 ${fmt(L.h)}h／キャパ ${fmt(cap)}h（${Math.round(r)}%）・上限まで残り ${fmt(Math.max(0,cap*settings.limit/100-L.h))}h`:"キャパ0hの日"}</span><span class="sp"></span>`+
     (wk?"":`<button class="btn" type="button" id="btnHol"${canWrite?"":" disabled"}>${isHoliday(selDay)?"休業日を解除":"休業日にする"}</button>`)+
-    `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+dayTimeline(selDay)+
+    `<button class="btn primary" type="button" id="btnDayAdd"${canWrite?"":" disabled"}>この日に1台追加</button></div>`+
+    (()=>{const bh=resvCapHTML(selDay);return `<div class="${bh.cls}">${bh.html}</div>`})()+
+    `<p class="hint">緑の枠が予約できる時間です。その上をドラッグすると（例：9時〜12時）、その日時で新しいカードを作れます。テクニシャンの行なら担当も入ります。</p>`+
+    dayTimeline(selDay,true)+
     (rows?`<div class="tbl-wrap"><table><thead><tr><th>顧客｜登録番号</th><th>区分</th><th>車型</th><th>工数</th><th>状態</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="hint">この日の入庫予定はありません</p>`)}
 /* その日の時間軸（月間の日付を押すと出る）。SAが電話で入庫時刻を案内するときの目安 */
 function dayTimeline(d,resv){
@@ -998,6 +1001,7 @@ function gapsOf(busy,from,to){const l=busy.filter(([a,b])=>b>from&&a<to).sort((p
 $("cal").addEventListener("click",e=>{const b=e.target.closest(".day");if(!b)return;selDay=b.dataset.d;renderMonth();$("dayPanel").scrollIntoView({block:"nearest",behavior:"smooth"})});
 $("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[data-id],.dtl-b[data-id]");if(tr){openCar(tr.dataset.id);return}
   if(e.target.id==="btnDayAdd")openCar(null,{inDate:selDay});
+  const go=e.target.closest("[data-go]");if(go){selDay=go.dataset.go;const g=new Date(selDay+"T00:00");mCur={y:g.getFullYear(),m:g.getMonth()};renderMonth();return}
   if(e.target.id==="btnHol"){try{await patchSettings({holidayMap:{[selDay]:!isHoliday(selDay)}})}catch(err){toast(errText(err))}}});
 $("mPrev").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m-1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
 $("mNext").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m+1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
@@ -1019,6 +1023,14 @@ const WD="日月火水木金土";
 function resvRoom(d){const cap=capOn(d);if(!cap)return{cap:0,lim:0,used:0,rem:0,lv:"off"};
   const lim=cap*settings.limit/100,used=dayLoad(d).h,rem=lim-used;
   return{cap,lim,used,rem,lv:rem<=0?"over":rem<Math.min(4,lim*0.25)?"warn":"ok"}}
+/* 予約できる残り時間の表示（予約ページと月間の日別で共通） */
+function resvCapHTML(d){const r=resvRoom(d);
+  if(r.lv==="off")return{cls:"rv-cap",html:`<span class="big">${md(d)}は休業日です</span><span class="sub">ほかの日をご案内ください</span>`};
+  const alt=[];for(let i=1;i<=21&&alt.length<3;i++){const x=addDays(d,i),q=resvRoom(x);if(q.lv==="ok")alt.push(x)}
+  return{cls:"rv-cap "+r.lv,html:(r.rem>0?`<span class="big">あと <b>${fmt(r.rem)}</b> h 予約できます</span>`:`<span class="big">予約上限に達しています</span>`)+
+    `<span class="rv-bar" title="予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h／キャパ ${fmt(r.cap)}h"><i style="width:${Math.min(100,r.used/r.cap*100)}%"></i><u style="left:${settings.limit}%"></u></span>`+
+    `<span class="sub">予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h（キャパ ${fmt(r.cap)}h の ${settings.limit}%）</span>`+
+    (r.lv!=="ok"&&alt.length?`<span class="rv-alt">空きのある日：${alt.map(x=>`<button class="btn" type="button" data-go="${x}">${md(x)}（${WD[new Date(x+"T00:00").getDay()]}）残${fmt(resvRoom(x).rem)}h</button>`).join("")}</span>`:"")}}
 const addDays=(d,n)=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+n);return isoOf(x.getFullYear(),x.getMonth(),x.getDate())};
 function renderResv(){const t=todayISO(),d=rDay,dt=new Date(d+"T00:00");
   $("rTitle").textContent=`${md(d)}（${WD[dt.getDay()]}）`;$("rDate").value=d;
@@ -1030,13 +1042,7 @@ function renderResv(){const t=todayISO(),d=rDay,dt=new Date(d+"T00:00");
     const bar=r.lv==="off"?"":`<span class="dbar"><i style="width:${Math.min(100,r.lim?r.used/r.lim*100:0)}%"></i></span>`;
     days+=`<button type="button" class="rv-d ${r.lv}${x===t?" today":""}${past?" past":""}" data-d="${x}" aria-pressed="${x===d}" title="${md(x)} 予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h"><span class="dd"><small>${+x.slice(5,7)}/</small>${+x.slice(8)}</span>${bar}<span class="dr">${r.lv==="off"?"休み":r.rem>0?"残 "+fmt(r.rem)+"h":"満"}</span></button>`}
   $("rDays").innerHTML=days+"</div>";
-  const r=resvRoom(d),cap=$("rCap");cap.className="rv-cap "+(r.lv==="off"?"":r.lv);
-  if(r.lv==="off")cap.innerHTML=`<span class="big">${md(d)}は休業日です</span><span class="sub">ほかの日をご案内ください</span>`;
-  else{const alt=[];for(let i=1;i<=21&&alt.length<3;i++){const x=addDays(d,i),q=resvRoom(x);if(q.lv==="ok")alt.push(x)}
-    cap.innerHTML=(r.rem>0?`<span class="big">あと <b>${fmt(r.rem)}</b> h 予約できます</span>`:`<span class="big">予約上限に達しています</span>`)+
-      `<span class="rv-bar" title="予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h／キャパ ${fmt(r.cap)}h"><i style="width:${Math.min(100,r.used/r.cap*100)}%"></i><u style="left:${settings.limit}%"></u></span>`+
-      `<span class="sub">予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h（キャパ ${fmt(r.cap)}h の ${settings.limit}%）</span>`+
-      (r.lv!=="ok"&&alt.length?`<span class="rv-alt">空きのある日：${alt.map(x=>`<button class="btn" type="button" data-go="${x}">${md(x)}（${WD[new Date(x+"T00:00").getDay()]}）残${fmt(resvRoom(x).rem)}h</button>`).join("")}</span>`:"")}
+  const cap=$("rCap"),bh=resvCapHTML(d);cap.className=bh.cls;cap.innerHTML=bh.html;
   $("rTl").innerHTML=dayTimeline(d,true)||`<p class="hint">この日は時間軸がありません（休業日、またはテクニシャン未登録）</p>`}
 $("rDays").addEventListener("click",e=>{const w=e.target.closest("[data-wk]");if(w){rDay=addDays(rDay,+w.dataset.wk);renderResv();return}
   const b=e.target.closest(".rv-d");if(b&&!b.classList.contains("past")){rDay=b.dataset.d;renderResv()}});
@@ -1052,17 +1058,19 @@ const RPX=84/60;
 function rMin(row,clientX){const inn=row.closest(".dtl-in"),x0=+inn.dataset.x0,x1=+inn.dataset.x1,b=row.getBoundingClientRect();
   return Math.max(x0,Math.min(x1,Math.round((x0+(clientX-b.left)/RPX)/15)*15))}
 function rWork(a,b){return Math.max(0,(b-a-lunchOverlap(a,b))/60)}
-$("rTl").addEventListener("pointerdown",e=>{if(!canWrite||e.button!==0)return;const blk=e.target.closest(".dtl-b");if(blk)return;
+const rStart=e=>{if(!canWrite||e.button!==0)return;const blk=e.target.closest(".dtl-b");if(blk)return;
   const row=e.target.closest(".dtl-r[data-tech]");if(!row)return;e.preventDefault();
-  if(rDay<todayISO()){toast("過ぎた日には予約できません");return}
-  const m=rMin(row,e.clientX),inn=row.closest(".dtl-in"),busy=parseBusy(row.dataset.busy);
+  const inn=row.closest(".dtl-in"),day=inn.dataset.d;
+  if(day<todayISO()){toast("過ぎた日には予約できません");return}
+  const m=rMin(row,e.clientX),busy=parseBusy(row.dataset.busy);
   if(busy.some(([a,b])=>m>=a&&m<b)){toast(row.dataset.tech?"この時間は予約できません（作業が入っている・始業前・終業後）":"この時間は全員ふさがっているため予約できません");return}
   const g0=Math.max(+inn.dataset.x0,...busy.filter(([a,b])=>b<=m).map(([a,b])=>b)),g1=Math.min(+inn.dataset.x1,...busy.filter(([a,b])=>a>m).map(([a,b])=>a));
   const sel=document.createElement("div");sel.className="rv-sel";row.appendChild(sel);
-  rDrag={row,a:m,b:m,g0,g1,sel,inn};try{row.setPointerCapture(e.pointerId)}catch(_){};rPaint()});
+  rDrag={row,a:m,b:m,g0,g1,sel,inn,d:day};try{row.setPointerCapture(e.pointerId)}catch(_){};rPaint()};
+$("rTl").addEventListener("pointerdown",rStart);$("dayPanel").addEventListener("pointerdown",rStart);
 function rPaint(){const z=rDrag;if(!z)return;const a=Math.min(z.a,z.b),b=Math.max(z.a,z.b),x0=+z.inn.dataset.x0;
   z.sel.style.left=((a-x0)*RPX)+"px";z.sel.style.width=Math.max(2,(b-a)*RPX)+"px";
-  const h=rWork(a,b),room=resvRoom(rDay).rem,over=h>0&&h>room+0.01;z.sel.classList.toggle("over",over);
+  const h=rWork(a,b),room=resvRoom(z.d).rem,over=h>0&&h>room+0.01;z.sel.classList.toggle("over",over);
   z.sel.innerHTML=b>a?`<span>${fmtMin(a)}–${fmtMin(b)}・${fmt(h)}h${over?"・上限超え":""}</span>`:""}
 addEventListener("pointermove",e=>{if(!rDrag)return;rDrag.b=Math.max(rDrag.g0,Math.min(rDrag.g1,rMin(rDrag.row,e.clientX)));rPaint()});
 addEventListener("pointerup",()=>{if(!rDrag)return;const z=rDrag;rDrag=null;z.sel.remove();
@@ -1070,10 +1078,10 @@ addEventListener("pointerup",()=>{if(!rDrag)return;const z=rDrag;rDrag=null;z.se
   if(b-a<15){toast("空いている時間が短すぎます");return}
   if(rWork(a,b)<0.25){toast("昼休みだけの時間は予約できません");return}
   const tech=z.row.dataset.tech||"",h=rWork(a,b);
-  resvPend={d:rDay,a,b,h,tech};
-  openCar(null,{inDate:rDay,inTime:fmtMin(a),...(tech?{tech}:{})});
-  if(tech)segEdit=[{id:"main",tech,from:rDay,at:a}];
-  $("carTitle").innerHTML=`新規予約 <span class="rv-head">${md(rDay)}（${WD[new Date(rDay+"T00:00").getDay()]}） ${fmtMin(a)}–${fmtMin(b)}・${fmt(h)}h${tech?"・担当 "+esc(tech):""}</span>`;
+  const day=z.d;resvPend={d:day,a,b,h,tech};
+  openCar(null,{inDate:day,inTime:fmtMin(a),...(tech?{tech}:{})});
+  if(tech)segEdit=[{id:"main",tech,from:day,at:a}];
+  $("carTitle").innerHTML=`新規予約 <span class="rv-head">${md(day)}（${WD[new Date(day+"T00:00").getDay()]}） ${fmtMin(a)}–${fmtMin(b)}・${fmt(h)}h${tech?"・担当 "+esc(tech):""}</span>`;
   $("f_extraH").value=fmt(h);updH()});
 /* 予約から開いたカード：区分に標準工数があればそれを使い、なければ選んだ時間を工数にする */
 ["f_kubun","f_vtype"].forEach(k=>$(k).addEventListener("change",()=>{if(!resvPend||editing)return;
