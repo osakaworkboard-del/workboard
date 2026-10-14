@@ -87,7 +87,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* 長期：入庫日から5日以上たっている車両。赤でゆっくり点滅 */
 .tag.long{color:#fff;background:var(--bad);font-weight:700;padding:1px 7px;border-radius:4px;animation:longBlink 2.4s ease-in-out infinite}
 @keyframes longBlink{0%,100%{opacity:1}50%{opacity:.35}}
-@media (prefers-reduced-motion:reduce){.tag.long{animation:none}}
+/* WIP番号が未入力のカード：黄色で点滅 */
+.wip.nowip{color:#5c4400;background:#ffd84d;font-weight:700;padding:0 6px;border-radius:4px;font-family:var(--f-body);animation:longBlink 1.8s ease-in-out infinite}
+.card.nowip{box-shadow:inset 0 0 0 2px #e8b800}
+@media (prefers-reduced-motion:reduce){.tag.long,.wip.nowip{animation:none}}
 .card.long{box-shadow:inset 0 0 0 2px var(--bad)}
 .tag.loan.on{color:var(--ink);font-weight:700}
 .req .lbl{font-size:11px;font-weight:700;color:var(--muted);margin-right:6px}
@@ -748,7 +751,7 @@ function cardHTML(c,t){
   const fam=famOf(c.kubun);
   const outCls=done||c.shipped||!c.outDate?"":c.outDate<t?"late":c.outDate===t?"today":"";
   const outL=c.outDate?`納車${md(c.outDate)}${c.outTime?" "+esc(c.outTime):""}`:"納車 未定";
-  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}${ld?" long":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top"><span class="wip">${esc(c.wip)}</span><span class="outd ${outCls}" title="納車（出庫）予定">${outL}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
+  return `<article class="card${fam?" "+fam:""}${c.shipped?" shipped":""}${ld?" long":""}${!c.wip&&!c.shipped?" nowip":""}" draggable="${canWrite}" tabindex="0" data-id="${esc(c.id)}"><div class="c-top">${c.wip?`<span class="wip">${esc(c.wip)}</span>`:`<span class="wip nowip" title="WIP番号が入っていません">WIP未入力</span>`}<span class="outd ${outCls}" title="納車（出庫）予定">${outL}</span></div><div class="plate">${esc(c.customer||"（顧客名なし）")}<span class="sep">｜</span>${esc(c.plate||"（登録番号なし）")}${c.kubun?`<span class="sep">｜</span>${k}`:""}</div>${l2}${foot?`<div class="c-foot">${foot}</div>`:""}</article>`}
 
 const board=$("board");
 board.addEventListener("click",e=>{const c=e.target.closest(".card");if(c)openCar(c.dataset.id)});
