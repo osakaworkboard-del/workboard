@@ -143,6 +143,31 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .m-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .m-bar h2{margin:0 4px;font-size:18px;min-width:7.5em;text-align:center;font-variant-numeric:tabular-nums}
 .m-sum{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+/* 予約ページ：2週間の残り時間 → 選んだ日の残り → 時間軸でドラッグして予約 */
+.rv-days{display:grid;grid-template-columns:repeat(14,minmax(64px,1fr));gap:6px;overflow-x:auto;padding-bottom:2px}
+.rv-d{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font:inherit;color:var(--ink);min-width:0}
+.rv-d .dw{font-size:11px;color:var(--muted)} .rv-d .dd{font-weight:700;font-size:14px;font-family:var(--f-mono)}
+.rv-d .dr{font-size:11.5px;font-family:var(--f-mono);font-weight:700;padding:0 6px;border-radius:999px}
+.rv-d.ok .dr{background:var(--ok-bg);color:var(--ok)} .rv-d.warn .dr{background:var(--warn-bg);color:var(--warn)} .rv-d.over .dr{background:var(--bad-bg);color:var(--bad)}
+.rv-d.off{background:var(--sunk);color:var(--muted);cursor:default} .rv-d.off .dr{color:var(--muted)}
+.rv-d[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.rv-d.today .dd{text-decoration:underline}
+.rv-cap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:12px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.rv-cap .big{font-size:22px;font-weight:700}
+.rv-cap .big b{font-family:var(--f-mono);font-size:30px}
+.rv-cap.ok{border-color:var(--ok);background:var(--ok-bg)} .rv-cap.ok .big{color:var(--ok)}
+.rv-cap.warn{border-color:var(--warn);background:var(--warn-bg)} .rv-cap.warn .big{color:var(--warn)}
+.rv-cap.over{border-color:var(--bad);background:var(--bad-bg)} .rv-cap.over .big{color:var(--bad)}
+.rv-cap .sub{font-size:13px;color:var(--ink)}
+.rv-bar{position:relative;flex:1 1 260px;min-width:200px;height:14px;border-radius:7px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.rv-bar i{position:absolute;top:0;bottom:0;left:0;background:var(--accent)}
+.rv-bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--bad)}
+.rv-alt{font-size:13px} .rv-alt button{margin-left:6px}
+#rTl .dtl-r[data-tech]{cursor:crosshair}
+.rv-sel{position:absolute;top:2px;bottom:2px;border-radius:6px;background:color-mix(in srgb,var(--accent) 22%,transparent);border:2px solid var(--accent);z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:visible}
+.rv-sel.over{background:color-mix(in srgb,var(--bad) 22%,transparent);border-color:var(--bad)}
+.rv-sel span{background:var(--surface);padding:0 6px;border-radius:4px;border:1px solid currentColor}
+.rv-head{font-size:13px;font-weight:700;color:var(--accent)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);align-items:center}
 .legend span{display:inline-flex;gap:6px;align-items:center}
 .lg{width:14px;height:8px;border-radius:2px;display:inline-block}
@@ -343,7 +368,7 @@ td.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 
 <header class="top">
   <div class="brand"><h1>作業管理ボード</h1><span class="date" id="today"></span></div>
-  <div class="tabs"><button type="button" id="tabBoard" aria-pressed="true">ボード</button><button type="button" id="tabPerson" aria-pressed="false">個人</button><button type="button" id="tabMonth" aria-pressed="false">月間</button><button type="button" id="tabHist" aria-pressed="false" hidden>履歴</button></div>
+  <div class="tabs"><button type="button" id="tabResv" aria-pressed="false">予約</button><button type="button" id="tabBoard" aria-pressed="true">ボード</button><button type="button" id="tabPerson" aria-pressed="false">個人</button><button type="button" id="tabMonth" aria-pressed="false">月間</button><button type="button" id="tabHist" aria-pressed="false" hidden>履歴</button></div>
   <div class="summary" id="summary"></div>
   <div class="actions">
     <input type="search" id="q" placeholder="登録番号・顧客・WIPで検索" aria-label="検索">
@@ -492,6 +517,19 @@ $("memAdd").addEventListener("click",async()=>{const em=$("memEmail").value.trim
 </script>
 
 <main class="board-wrap" id="boardView"><div class="board" id="board"></div></main>
+<main class="month" id="resvView" hidden>
+  <div class="m-bar">
+    <button class="btn" type="button" id="rPrev" aria-label="前の日">‹</button>
+    <h2 id="rTitle"></h2>
+    <button class="btn" type="button" id="rNext" aria-label="次の日">›</button>
+    <button class="btn" type="button" id="rToday">今日</button>
+    <input type="date" id="rDate" aria-label="日付を選ぶ" class="pdate">
+  </div>
+  <div class="rv-days" id="rDays" aria-label="2週間の予約状況"></div>
+  <div class="rv-cap" id="rCap"></div>
+  <p class="hint">時間軸の上をドラッグすると（例：9時〜12時）、その日時で新しいカードを作れます。テクニシャンの行でドラッグすると担当も入ります。緑の時間帯が空いている時間です。</p>
+  <div id="rTl"></div>
+</main>
 <main class="month" id="personView" hidden>
   <div class="m-bar">
     <button class="btn" type="button" id="pPrev" aria-label="前の日">‹</button>
@@ -827,7 +865,7 @@ function render(){
   $("board").innerHTML=STATES.map(([s,v])=>{
     const cs=list.filter(c=>(c.state||"入庫済み")===s).sort((a,b)=>key(a)<key(b)?-1:1);
     return `<section class="col" data-state="${s}" style="--sc:var(${v})"><div class="col-h"><span class="dot"></span><h2>${s}</h2><span class="n">${cs.length}</span></div><div class="cards">${cs.length?cs.map(c=>cardHTML(c,t)).join(""):`<div class="empty">${s==="入庫待ち"&&!all.length?"「DMSから貼り付け」で入庫車両を取り込むと、ここにカードが並びます":"カードをここへドラッグ"}</div>`}</div></section>`}).join("");
-  if(!$("monthView").hidden)renderMonth();if(!$("personView").hidden)renderPerson();if(!$("histView").hidden)renderHist()}
+  if(!$("monthView").hidden)renderMonth();if(!$("personView").hidden)renderPerson();if(!$("histView").hidden)renderHist();if(!$("resvView").hidden)renderResv()}
 function cardHTML(c,t){
   const done=c.state==="完成";
   const waiting=(c.state||"入庫済み")==="入庫待ち";
@@ -1072,16 +1110,16 @@ function dayTimeline(d){
     return `<div class="dtl-b ${famOf(c.kubun)}${cls?" "+cls:""}" data-id="${esc(p.cid)}" style="left:${x(p.start)+1}px;width:${Math.max(18,x(p.end)-x(p.start)-2)}px" title="${esc(nm)}　${fmtMin(p.start)}–${fmtMin(p.end)}（${fmt(p.h)}h）${c.kubun?"　"+esc(c.kubun):""}　${esc(c.shipped?"出庫済":(c.state||""))}">${esc(nm)}</div>`};
   const now=d===todayISO()?(()=>{const n=new Date(),m=n.getHours()*60+n.getMinutes();return m>X0&&m<X1?`<div class="dtl-now" style="left:${x(m)}px"></div>`:""})():"";
   let h=`<div class="dtl-n">時刻</div><div class="dtl-r dtl-ax" style="width:${W}px">${ticks}</div>`+
-    `<div class="dtl-n">空き人数</div><div class="dtl-r dtl-free" style="width:${W}px">${free}</div>`;
+    `<div class="dtl-n">空き人数</div><div class="dtl-r dtl-free" data-tech="" style="width:${W}px">${free}</div>`;
   for(const r of rows){const st=r.att?ATT[r.att]:"";
     const body=!r.cap?`<div class="dtl-off" style="left:0;width:${W}px">${esc(st||"作業不可")}</div>`:
       lunch+(r.end<X1?`<div class="dtl-off" style="left:${x(r.end)}px;width:${W-x(r.end)}px">${r.att==="H"?"半休":""}</div>`:"")+(S>X0?`<div class="dtl-off" style="left:0;width:${x(S)}px"></div>`:"")+r.places.map(p=>blk(p)).join("");
-    h+=`<div class="dtl-n">${esc(r.t.name)}${st?`<small>${esc(st)}</small>`:""}</div><div class="dtl-r" style="width:${W}px">${body}${now}</div>`}
-  lanes.forEach((l,i)=>{h+=`<div class="dtl-n">${i?"":"未割当"}${i?"":`<small>${unas.length}件</small>`}</div><div class="dtl-r" style="width:${W}px">${lunch}${l.map(u=>blk(u,"un")).join("")}</div>`});
+    h+=`<div class="dtl-n">${esc(r.t.name)}${st?`<small>${esc(st)}</small>`:""}</div><div class="dtl-r"${r.cap?` data-tech="${esc(r.t.name)}"`:""} style="width:${W}px">${body}${now}</div>`}
+  lanes.forEach((l,i)=>{h+=`<div class="dtl-n">${i?"":"未割当"}${i?"":`<small>${unas.length}件</small>`}</div><div class="dtl-r" data-tech="" style="width:${W}px">${lunch}${l.map(u=>blk(u,"un")).join("")}</div>`});
   const unH=unas.reduce((a,u)=>a+u.h,0),net=freeH-unH;
   return `<div class="dtl-sum"><span>空き時間 合計 <b>${fmt(freeH)}h</b></span>${unH?`<span>未割当の作業 <b>${fmt(unH)}h</b></span><span>割り当て後の空き 見込み <b>${fmt(Math.max(0,net))}h</b></span>`:""}`+
     `<span class="dtl-key"><i style="background:var(--ok-bg);border:1px solid var(--ok)"></i>2人以上空き</span><span class="dtl-key"><i style="background:var(--warn-bg);border:1px solid var(--warn)"></i>1人空き</span><span class="dtl-key"><i style="background:var(--bad-bg);border:1px solid var(--bad)"></i>空きなし</span></div>`+
-    `<div class="dtl"><div class="dtl-in">${h}</div></div>`}
+    `<div class="dtl"><div class="dtl-in" data-x0="${X0}" data-x1="${X1}" data-d="${d}">${h}</div></div>`}
 $("cal").addEventListener("click",e=>{const b=e.target.closest(".day");if(!b)return;selDay=b.dataset.d;renderMonth();$("dayPanel").scrollIntoView({block:"nearest",behavior:"smooth"})});
 $("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[data-id],.dtl-b[data-id]");if(tr){openCar(tr.dataset.id);return}
   if(e.target.id==="btnDayAdd")openCar(null,{inDate:selDay});
@@ -1089,14 +1127,72 @@ $("dayPanel").addEventListener("click",async e=>{const tr=e.target.closest("tr[d
 $("mPrev").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m-1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
 $("mNext").addEventListener("click",()=>{const d=new Date(mCur.y,mCur.m+1,1);mCur={y:d.getFullYear(),m:d.getMonth()};selDay=null;renderMonth()});
 $("mToday").addEventListener("click",()=>{const d=new Date();mCur={y:d.getFullYear(),m:d.getMonth()};selDay=todayISO();renderMonth()});
-function showTab(v){const b=v==="b";$("tabBoard").setAttribute("aria-pressed",b);$("tabMonth").setAttribute("aria-pressed",v==="m");$("tabPerson").setAttribute("aria-pressed",v==="p");$("tabHist").setAttribute("aria-pressed",v==="h");
+function showTab(v){const b=v==="b";$("tabBoard").setAttribute("aria-pressed",b);$("tabResv").setAttribute("aria-pressed",v==="r");$("resvView").hidden=v!=="r";$("tabMonth").setAttribute("aria-pressed",v==="m");$("tabPerson").setAttribute("aria-pressed",v==="p");$("tabHist").setAttribute("aria-pressed",v==="h");
   $("boardView").hidden=!b;$("monthView").hidden=v!=="m";$("personView").hidden=v!=="p";$("histView").hidden=v!=="h";
   document.querySelector(".actions").hidden=!b;$("summary").hidden=!b;$("tip").hidden=true;
-  if(v==="m")renderMonth();if(v==="p")renderPerson();if(v==="h")renderHist();try{localStorage.setItem("wbTab",v)}catch(e){}}
+  if(v==="m")renderMonth();if(v==="p")renderPerson();if(v==="h")renderHist();if(v==="r")renderResv();try{localStorage.setItem("wbTab",v)}catch(e){}}
 $("tabBoard").addEventListener("click",()=>showTab("b"));
+$("tabResv").addEventListener("click",()=>showTab("r"));
 $("tabMonth").addEventListener("click",()=>showTab("m"));
 $("tabPerson").addEventListener("click",()=>showTab("p"));
 $("tabHist").addEventListener("click",()=>showTab("h"));
+
+/* ---------- 予約（SAが電話で日程を決める画面） ---------- */
+let rDay=todayISO(),rDrag=null,resvPend=null;
+const WD="日月火水木金土";
+/* その日に、予約上限（キャパ×上限%）まであと何時間入れられるか */
+function resvRoom(d){const cap=capOn(d);if(!cap)return{cap:0,lim:0,used:0,rem:0,lv:"off"};
+  const lim=cap*settings.limit/100,used=dayLoad(d).h,rem=lim-used;
+  return{cap,lim,used,rem,lv:rem<=0?"over":rem<Math.min(4,lim*0.25)?"warn":"ok"}}
+const addDays=(d,n)=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+n);return isoOf(x.getFullYear(),x.getMonth(),x.getDate())};
+function renderResv(){const t=todayISO(),d=rDay,dt=new Date(d+"T00:00");
+  $("rTitle").textContent=`${md(d)}（${WD[dt.getDay()]}）`;$("rDate").value=d;
+  /* 2週間の帯：今日から（選んだ日が先なら、その週から） */
+  const start=d<t?d:(d>addDays(t,13)?addDays(d,-3):t);let days="";
+  for(let i=0;i<14;i++){const x=addDays(start,i),r=resvRoom(x),w=new Date(x+"T00:00").getDay();
+    days+=`<button type="button" class="rv-d ${r.lv}${x===t?" today":""}" data-d="${x}" aria-pressed="${x===d}"><span class="dw">${WD[w]}</span><span class="dd">${md(x)}</span><span class="dr">${r.lv==="off"?"休み":r.rem>0?"残"+fmt(r.rem)+"h":"満"}</span></button>`}
+  $("rDays").innerHTML=days;
+  const r=resvRoom(d),cap=$("rCap");cap.className="rv-cap "+(r.lv==="off"?"":r.lv);
+  if(r.lv==="off")cap.innerHTML=`<span class="big">${md(d)}は休業日です</span><span class="sub">ほかの日をご案内ください</span>`;
+  else{const alt=[];for(let i=1;i<=21&&alt.length<3;i++){const x=addDays(d,i),q=resvRoom(x);if(q.lv==="ok")alt.push(x)}
+    cap.innerHTML=(r.rem>0?`<span class="big">あと <b>${fmt(r.rem)}</b> h 予約できます</span>`:`<span class="big">予約上限に達しています</span>`)+
+      `<span class="rv-bar" title="予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h／キャパ ${fmt(r.cap)}h"><i style="width:${Math.min(100,r.used/r.cap*100)}%"></i><u style="left:${settings.limit}%"></u></span>`+
+      `<span class="sub">予約 ${fmt(r.used)}h／上限 ${fmt(r.lim)}h（キャパ ${fmt(r.cap)}h の ${settings.limit}%）</span>`+
+      (r.lv!=="ok"&&alt.length?`<span class="rv-alt">空きのある日：${alt.map(x=>`<button class="btn" type="button" data-go="${x}">${md(x)}（${WD[new Date(x+"T00:00").getDay()]}）残${fmt(resvRoom(x).rem)}h</button>`).join("")}</span>`:"")}
+  $("rTl").innerHTML=dayTimeline(d)||`<p class="hint">この日は時間軸がありません（休業日、またはテクニシャン未登録）</p>`}
+$("rDays").addEventListener("click",e=>{const b=e.target.closest(".rv-d");if(b){rDay=b.dataset.d;renderResv()}});
+$("rCap").addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b){rDay=b.dataset.go;renderResv()}});
+$("rPrev").addEventListener("click",()=>{rDay=addDays(rDay,-1);renderResv()});
+$("rNext").addEventListener("click",()=>{rDay=addDays(rDay,1);renderResv()});
+$("rToday").addEventListener("click",()=>{rDay=todayISO();renderResv()});
+$("rDate").addEventListener("change",()=>{if($("rDate").value){rDay=$("rDate").value;renderResv()}});
+/* 時間軸をドラッグ → 時間帯を選ぶ（15分きざみ）→ その日時でカード作成 */
+const RPX=84/60;
+function rMin(row,clientX){const inn=row.closest(".dtl-in"),x0=+inn.dataset.x0,x1=+inn.dataset.x1,b=row.getBoundingClientRect();
+  return Math.max(x0,Math.min(x1,Math.round((x0+(clientX-b.left)/RPX)/15)*15))}
+function rWork(a,b){return Math.max(0,(b-a-lunchOverlap(a,b))/60)}
+$("rTl").addEventListener("pointerdown",e=>{if(!canWrite||e.button!==0)return;const blk=e.target.closest(".dtl-b");if(blk)return;
+  const row=e.target.closest(".dtl-r[data-tech]");if(!row)return;e.preventDefault();
+  const m=rMin(row,e.clientX),sel=document.createElement("div");sel.className="rv-sel";row.appendChild(sel);
+  rDrag={row,a:m,b:m,sel,inn:row.closest(".dtl-in")};try{row.setPointerCapture(e.pointerId)}catch(_){};rPaint()});
+function rPaint(){const z=rDrag;if(!z)return;const a=Math.min(z.a,z.b),b=Math.max(z.a,z.b),x0=+z.inn.dataset.x0;
+  z.sel.style.left=((a-x0)*RPX)+"px";z.sel.style.width=Math.max(2,(b-a)*RPX)+"px";
+  const h=rWork(a,b),room=resvRoom(rDay).rem,over=h>0&&h>room+0.01;z.sel.classList.toggle("over",over);
+  z.sel.innerHTML=b>a?`<span>${fmtMin(a)}–${fmtMin(b)}・${fmt(h)}h${over?"・上限超え":""}</span>`:""}
+addEventListener("pointermove",e=>{if(!rDrag)return;rDrag.b=rMin(rDrag.row,e.clientX);rPaint()});
+addEventListener("pointerup",()=>{if(!rDrag)return;const z=rDrag;rDrag=null;z.sel.remove();
+  let a=Math.min(z.a,z.b),b=Math.max(z.a,z.b);if(b-a<15)b=a+60;   // クリックだけなら1時間
+  const tech=z.row.dataset.tech||"",h=rWork(a,b);
+  resvPend={d:rDay,a,b,h,tech};
+  openCar(null,{inDate:rDay,inTime:fmtMin(a),...(tech?{tech}:{})});
+  if(tech)segEdit=[{id:"main",tech,from:rDay,at:a}];
+  $("carTitle").innerHTML=`新規予約 <span class="rv-head">${md(rDay)}（${WD[new Date(rDay+"T00:00").getDay()]}） ${fmtMin(a)}–${fmtMin(b)}・${fmt(h)}h${tech?"・担当 "+esc(tech):""}</span>`;
+  $("f_extraH").value=fmt(h);updH()});
+/* 予約から開いたカード：区分に標準工数があればそれを使い、なければ選んだ時間を工数にする */
+["f_kubun","f_vtype"].forEach(k=>$(k).addEventListener("change",()=>{if(!resvPend||editing)return;
+  const o={kubun:$("f_kubun").value,vtype:$("f_vtype").value};$("f_extraH").value=hasStd(o)?"":fmt(resvPend.h);updH()}));
+$("dlgCar").addEventListener("close",()=>{resvPend=null});
+$("rTl").addEventListener("click",e=>{const b=e.target.closest(".dtl-b[data-id]");if(b)openCar(b.dataset.id)});
 
 /* ---------- 個人作業ボード ---------- */
 let pDay=todayISO();
@@ -1271,7 +1367,7 @@ $("btnSetSave").addEventListener("click",async()=>{const limit=parseFloat($("s_l
   const dayStart=$("s_start").value||"09:00",lunchFrom=$("s_l0").value,lunchTo=$("s_l1").value;
   if(lunchFrom&&lunchTo&&lunchTo<=lunchFrom){note.textContent="昼休みの終了は開始より後にしてください";return}
   try{await patchSettings({limit,techs,dayStart,lunchFrom,lunchTo});$("dlgSet").close();toast("キャパ設定を保存しました")}catch(e){note.textContent=errText(e)}});
-try{const v=localStorage.getItem("wbTab");if(v==="m"||v==="p")showTab(v)}catch(e){}
+try{const v=localStorage.getItem("wbTab");if(v==="m"||v==="p"||v==="r")showTab(v)}catch(e){}
 
 /* ---------- 整備履歴・月別請求 ---------- */
 let invoices=new Map(),hTab="list",sampleFn=null,sampleCaps=null;

@@ -21,7 +21,7 @@ page, script = src[:head_end], src[head_end:]
 page = rep(page, '<button type="button" id="tabHist" aria-pressed="false">履歴</button>',
            '<button type="button" id="tabHist" aria-pressed="false" hidden>履歴</button>')
 s = script
-s = rep(s, 'if(v==="m"||v==="p"||v==="h")showTab(v)', 'if(v==="m"||v==="p")showTab(v)')
+s = rep(s, 'if(v==="m"||v==="p"||v==="h"||v==="r")showTab(v)', 'if(v==="m"||v==="p"||v==="r")showTab(v)')
 s = rep(s, 'function renderCardHist(c){const b=$("histBlock");', 'function renderCardHist(c){const b=$("histBlock");b.hidden=true;return;')
 s = rep(s, 'db.collection("invoices").onSnapshot(s=>{invoices=new Map(s.docs.map(d=>[d.id,{...d.data(),id:d.id}]));if(!$("histView").hidden)renderHist()},()=>{});', '')
 s = rep(s, '（カード${lb.cars||0}件・請求書${lb.invoices||0}件）', '（カード${lb.cars||0}件）')
